@@ -1,0 +1,9 @@
+- name: Provision VM using Vagrant
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Execute Vagrant up
+      command: vagrant up
+      args:
+        chdir: ./Vagrant
+      become: false

@@ -3,4 +3,19 @@
 grafana_server:
   hosts:
     grf_srv_01:
-       ansible_host: #we can insert either ip or name and read it from ~/home/itp22109/ssh_config
+       ansible_host: grf_srv_01 #we can insert either ip or name and read it from ~/home/itp22109/ssh_config
+
+influxdb_server:
+  hosts:
+    infdb_srv_01:
+       ansible_host: infdb_srv_01 
+
+oc_srv_01_server:
+  hosts:
+    oc_srv_01:
+       ansible_host: oc_srv_01
+
+tlg_srv_01_server:
+  hosts:
+    tlg_srv_01:
+       ansible_host: tlg_srv_01
