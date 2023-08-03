@@ -3,4 +3,4 @@
 grafana_server:
   hosts:
     grf_srv_01:
-       
+       ansible_host: #we can insert either ip or name and read it from ~/home/itp22109/ssh_config
