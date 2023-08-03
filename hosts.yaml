@@ -1,0 +1,6 @@
+---
+#This is the inventory file with the groups of servers, which are the target machines I want to manage
+grafana_server:
+  hosts:
+    grf_srv_01:
+       
