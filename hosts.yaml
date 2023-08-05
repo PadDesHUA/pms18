@@ -1,5 +1,10 @@
 ---
 #This is the inventory file with the groups of servers, which are the target machines I want to manage
+control:
+  hosts:
+    control:
+      ansible_host: control
+
 grafana_server:
   hosts:
     grf_srv_01:

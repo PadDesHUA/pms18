@@ -1,21 +1,52 @@
 ---
+- name: Provision Control Station with Vagrant
+  hosts: localhost
+  gather_facts: no
 
-- name: Install necessary packages
-    apt:
-      name: "{{ item }}"
-      state: present
-    with_items:
-      - vagrant
-      - virtualbox
-      - ansible
-    become: true
+  tasks:
+    - name: Run Vagrant Up Control Station
+      command: vagrant up control
+      args:
+        chdir: /home/itp22109/pms18/Vagrant/
+      tags:
+        - vagrant_provision
+
+- name: Install necessary packages at control station
+  hosts: control
+  remote_user: vagrant
+  become: true
+  tasks:
+    - name: Update apt update_cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
+      tags:
+        - update_apt_cache
+
+    - name: Install packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - vagrant
+        - virtualbox
+        - virtualbox-ext-pack
+        - virtualbox-qt
+        - ansible
+      when: ansible_os_family == 'Debian'
+      ignore_errors: yes
+      tags:
+        - install_packages
 
 - name: Provision VM using Vagrant
-  hosts: all
-  gather_facts: false
+  hosts: localhost
+  gather_facts: true
   tasks:
     - name: Execute Vagrant up
       command: vagrant up
       args:
         chdir: ./Vagrant
       become: false
+      tags:
+        -vagrant_all
+

@@ -1,0 +1,32 @@
+---
+- name: Install InfluxDB 2
+  hosts: infdb-srv-01
+  become: true
+  tasks:
+    - name: Fetch the InfluxData GPG key
+      shell: wget -q https://repos.influxdata.com/influxdata-archive_compat.key
+      args:
+        chdir: /tmp
+      register: wget_output
+
+    - name: Verify the GPG key checksum
+      shell: echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c /tmp/influxdata-archive_compat.key' | sha256sum -c
+      register: sha_output
+      ignore_errors: yes  # Ignore the error temporarily as GPG import might fail on first run
+
+    - name: Import the GPG key using gpg
+      shell: cat /tmp/influxdata-archive_compat.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
+      when: sha_output is success
+
+    - name: Add InfluxData repository to apt sources list
+      shell: echo 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main' | sudo tee /etc/apt/sources.list.d/influxdata.list
+      when: sha_output is success
+
+    - name: Update the package cache
+      apt:
+        update_cache: yes
+
+    - name: Install InfluxDB 2
+      apt:
+        name: influxdb2
+        state: present
