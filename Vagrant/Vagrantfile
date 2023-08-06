@@ -33,9 +33,9 @@ Vagrant.configure("2") do |config|
       SCRIPT
     end
 
-    config.vm.define "ocsrv01", primary: true do |node|
+    config.vm.define "oc-srv-01", primary: true do |node|
       node.vm.box = "envimation/ubuntu-xenial"
-      node.vm.hostname = "ocsrv01"
+      node.vm.hostname = "oc-srv-01"
       node.vm.network "private_network", ip: "192.168.56.20"
       node.vm.provider :virtualbox do |vb|
         vb.name = "OwnCloud"
@@ -47,13 +47,15 @@ Vagrant.configure("2") do |config|
       SHELL
     end
 
-    config.vm.define "infdb_srv_01", primary: true do |node|
+    config.vm.define "infdb-srv-01", primary: true do |node|
       node.vm.box = "envimation/ubuntu-xenial"
       node.vm.hostname = 'infdb-srv-01'
       node.vm.network "private_network", ip: "192.168.56.30"
       node.vm.provider :virtualbox do |vb|
         vb.name = "InfluxDB"
         vb.cpus = 1
+        # Add the port forwarding configuration for port 8086
+        vb.customize ["modifyvm", :id, "--natpf1", "influxdb,tcp,,8086,,8086"]
       end
 
       node.vm.provision :shell, :inline => <<-SHELL
@@ -61,10 +63,10 @@ Vagrant.configure("2") do |config|
       SHELL
     end
 
-    config.vm.define "grf_srv_01", primary: true do |node|
+    config.vm.define "grf-srv-01", primary: true do |node|
       node.vm.box = "envimation/ubuntu-xenial"
       node.vm.hostname = 'grf-srv-01'
-      node.vm.network "private_network", ip: "192.168.56.30"
+      node.vm.network "private_network", ip: "192.168.56.40"
       node.vm.provider :virtualbox do |vb|
         vb.name = "Grafana"
         vb.cpus = 1
@@ -75,10 +77,10 @@ Vagrant.configure("2") do |config|
       SHELL
     end
 
-    config.vm.define "tlg_srv_01", primary: true do |node|
+    config.vm.define "tlg-srv-01", primary: true do |node|
       node.vm.box = "envimation/ubuntu-xenial"
       node.vm.hostname = 'tlg-srv-01'
-      node.vm.network "private_network", ip: "192.168.56.30"
+      node.vm.network "private_network", ip: "192.168.56.50"
       node.vm.provider :virtualbox do |vb|
         vb.name = "Telegraf"
         vb.cpus = 1

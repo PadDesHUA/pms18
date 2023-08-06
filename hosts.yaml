@@ -5,22 +5,22 @@ control:
     control:
       ansible_host: control
 
-grafana_server:
+grafana-server:
   hosts:
-    grf_srv_01:
-       ansible_host: grf_srv_01 #we can insert either ip or name and read it from ~/home/itp22109/ssh_config
+    grf-srv-01:
+       ansible_host: grf-srv-01 #we can insert either ip or name and read it from ~/home/itp22109/ssh_config
 
-influxdb_server:
+influxdb-server:
   hosts:
-    infdb_srv_01:
-       ansible_host: infdb_srv_01 
+    infdb-srv-01:
+       ansible_host: infdb-srv-01 
 
-oc_srv_01_server:
+owncloud-server:
   hosts:
-    oc_srv_01:
-       ansible_host: oc_srv_01
+    oc-srv-01:
+       ansible_host: oc-srv-01
 
-tlg_srv_01_server:
+telegraf-server:
   hosts:
-    tlg_srv_01:
-       ansible_host: tlg_srv_01
+    tlg-srv-01:
+       ansible_host: tlg-srv-01
