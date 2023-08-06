@@ -93,14 +93,7 @@
          - influxdb_install
 
     - name: Set up initial user
-      uri:
-        url: "http://localhost:8086/api/v2/users"
-        method: POST
-        body_format: json
-        headers:
-          Content-Type: "application/json"
-        body: '{"name": "vagrant", "password": "vagrant", "org": "pms18", "bucket": "mybucket"}'
-        return_content: yes
+      command: "curl -X POST 'http://localhost:8086/api/v2/setup' -H 'Content-Type: application/json' -d '{\"username\": \"your-username\", \"password\": \"your-password\", \"org\": \"your-organization\", \"bucket\": \"your-bucket\"}'"
       register: influxdb_user_response
       when: ansible_os_family == 'Debian'
       tags:
