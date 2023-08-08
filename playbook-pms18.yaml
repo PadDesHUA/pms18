@@ -100,26 +100,6 @@
         name: influxdb
         state: started
 
-    # - name: Download and import InfluxData public key
-    #   command: curl -s https://repos.influxdata.com/influxdata-archive_compat.key | gpg --import
-
-    # - name: Download InfluxData public key
-    #   command: curl -s https://repos.influxdata.com/influxdata-archive_compat.key
-    #   register: key_download_result
-
-    # - name: Import InfluxData public key
-    #   command: echo "{{ key_download_result.stdout }}" | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
-
-    # - name: Download signature file
-    #   command: wget https://dl.influxdata.com/influxdb/releases/influxdb-1.8.10_linux_amd64.tar.gz.asc
-
-    # - name: Verify signature
-    #   command: gpg --verify influxdb-1.8.10_linux_amd64.tar.gz.asc influxdb-1.8.10_linux_amd64.tar.gz
-    #   register: signature_verification_result
-    #   failed_when: signature_verification_result.rc != 0
-    #   changed_when: false
-
-
     - name: Download InfluxData public key
       command: curl -s https://repos.influxdata.com/influxdata-archive_compat.key
       register: key_download_result
@@ -165,7 +145,7 @@
         owner: vagrant
         group: vagrant
         mode: "0644"
-        
+
 - name: Install Telegraf
   hosts: tlg-srv-01
   become: yes
@@ -191,22 +171,60 @@
         name: telegraf
         state: present
       
+- name: Install and configure Grafana
+  hosts: your_remote_host
+  become: true
+  tasks:
+    - name: Install prerequisites
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - apt-transport-https
+        - software-properties-common
+        - wget
+
+    - name: Add Grafana GPG key
+      shell: |
+        sudo wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key
+      changed_when: false  # Assuming the key doesn't change frequently
+
+    - name: Add Grafana repository
+      blockinfile:
+        path: /etc/apt/sources.list.d/grafana.list
+        block: |
+          deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main
+          deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com beta main
+
+    - name: Update package cache
+      apt:
+        update_cache: yes
+
+    - name: Install Grafana
+      apt:
+        name: grafana
+        state: present
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Start Grafana service
+      systemd:
+        name: grafana-server
+        state: started
+        enabled: yes
+
+    - name: Check Grafana service status
+      systemd:
+        name: grafana-server
+        state: status
+
+
 
 
   handlers:
     - name: Start InfluxDB service
       systemd:
         name: influxdb
-        state: started   
-    # - name: InfluxDB service enable-start+
-
-    #   shell: systemctl enable influxdb && systemctl start influxdb
-    #   register: service_status
-    #   changed_when: false
-      
-
-    # - name: Check service
-    #   shell: sudo ps -ef | grep influx
-    #   failed_when: servic!= 0
-
-      
+        state: started
