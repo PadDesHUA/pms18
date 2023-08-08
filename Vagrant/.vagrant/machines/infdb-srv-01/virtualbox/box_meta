@@ -1,1 +1,1 @@
-{"name":"envimation/ubuntu-xenial","version":"1.0.3-1516241473","provider":"virtualbox","directory":"boxes/envimation-VAGRANTSLASH-ubuntu-xenial/1.0.3-1516241473/virtualbox"}
+{"name":"ubuntu/jammy64","version":"20230805.0.0","provider":"virtualbox","directory":"boxes/ubuntu-VAGRANTSLASH-jammy64/20230805.0.0/virtualbox"}

@@ -1,6 +1,21 @@
 ---
+- name: Read local /etc/hosts file
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Read /etc/hosts file
+      shell: cat /etc/hosts | grep 192.168.56. > ~/pms18/Vagrant/pms18_hosts
+
+
+- name: Append local /etc/hosts entries to remote hosts
+  hosts: all
+  become: yes
+  tasks:
+    - name: Append /etc/hosts entries
+      shell: cat /vagrant/pms18_hosts >> /etc/hosts
+      
 - name: Provision Control Station with Vagrant
-  hosts: infdb-srv-01
+  hosts: localhost
   gather_facts: no
 
   tasks:
@@ -39,70 +54,219 @@
         - install_packages
 
 - name: Provision VM using Vagrant
-  hosts: infdb-srv-01
+  hosts: localhost
   gather_facts: true
   tasks:
     - name: Execute Vagrant up
       command: vagrant up
       args:
-        chdir: ./Vagrant
+        chdir: /home/itp22109/pms18/Vagrant/
       become: false
       tags:
         - vagrant_all
 
-- name: InfluxDB Installation
+- name: Install InfluxDB
   hosts: infdb-srv-01
-  remote_user: vagrant
-  become: true
+  become: yes
+
   tasks:
-    - name: Fetch the InfluxData GPG key
-      shell: wget -q https://repos.influxdata.com/influxdata-archive_compat.key
-      args:
-        chdir: /tmp
-      register: wget_output
+    - name: Download InfluxData archive key
+      command: wget -q https://repos.influxdata.com/influxdata-archive_compat.key
+      register: key_download_result
 
-    - name: Verify the GPG key checksum
-      shell: echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c /tmp/influxdata-archive_compat.key' | sha256sum -c
-      register: sha_output
-      ignore_errors: yes  # Ignore the error temporarily as GPG import might fail on first run
+    - name: Verify key using sha256sum
+      shell: echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c influxdata-archive_compat.key' | sha256sum -c
+      register: key_verification_result
+      failed_when: key_verification_result.rc != 0
 
-    - name: Import the GPG key using gpg
-      shell: cat /tmp/influxdata-archive_compat.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
-      when: sha_output is success
+    - name: Import key and trust GPG key
+      shell: cat influxdata-archive_compat.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
+      when: key_verification_result.rc == 0
 
-    - name: Add InfluxData repository to apt sources list
+    - name: Add InfluxData repository
       shell: echo 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main' | sudo tee /etc/apt/sources.list.d/influxdata.list
-      when: sha_output is success
 
-    - name: Update the package cache
+    - name: Update apt cache
       apt:
         update_cache: yes
 
-    - name: Install InfluxDB 2
+    - name: Install InfluxDB
       apt:
-        name: influxdb2
+        name: influxdb
         state: present
-      notify: 
-        - Start InfluxDB Service
-      
-    - name: Check service
-      shell: sudo ps -ef | grep influx
-      register: service_status
+
+    - name: Start InfluxDB service
+      service:
+        name: influxdb
+        state: started
+
+    # - name: Download and import InfluxData public key
+    #   command: curl -s https://repos.influxdata.com/influxdata-archive_compat.key | gpg --import
+
+    # - name: Download InfluxData public key
+    #   command: curl -s https://repos.influxdata.com/influxdata-archive_compat.key
+    #   register: key_download_result
+
+    # - name: Import InfluxData public key
+    #   command: echo "{{ key_download_result.stdout }}" | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
+
+    # - name: Download signature file
+    #   command: wget https://dl.influxdata.com/influxdb/releases/influxdb-1.8.10_linux_amd64.tar.gz.asc
+
+    # - name: Verify signature
+    #   command: gpg --verify influxdb-1.8.10_linux_amd64.tar.gz.asc influxdb-1.8.10_linux_amd64.tar.gz
+    #   register: signature_verification_result
+    #   failed_when: signature_verification_result.rc != 0
+    #   changed_when: false
+
+
+    - name: Download InfluxData public key
+      command: curl -s https://repos.influxdata.com/influxdata-archive_compat.key
+      register: key_download_result
+
+    - name: Import InfluxData public key
+      command: echo "{{ key_download_result.stdout }}" | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
+
+    - name: Download InfluxDB release archive
+      command: wget https://dl.influxdata.com/influxdb/releases/influxdb-1.8.10_linux_amd64.tar.gz
+      register: download_result
+
+    - name: Download InfluxDB release archive
+      command: curl -o influxdb-1.8.10_linux_amd64.tar.gz https://dl.influxdata.com/influxdb/releases/influxdb-1.8.10_linux_amd64.tar.gz
+      register: download_result
+      ignore_errors: yes
+
+    - name: Import InfluxData public key for verification
+      command: gpg --import /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg
+
+    - name: Verify signature
+      command: gpg --verify influxdb-1.8.10_linux_amd64.tar.gz.asc influxdb-1.8.10_linux_amd64.tar.gz
+      register: signature_verification_result
+      failed_when: signature_verification_result.rc != 0
       changed_when: false
-      tags:
-         - influxdb_install
 
-    - name: Set up initial user
-      command: "curl -X POST 'http://localhost:8086/api/v2/setup' -H 'Content-Type: application/json' -d '{\"username\": \"vagrant\", \"password\": \"vagrant\", \"org\": \"pms18@HUA\", \"bucket\": \"mybucket01\"}'"
-      register: influxdb_user_response
-      when: ansible_os_family == 'Debian'
-      tags:
-        - influx_initial_user
-
-    - name: Print initial user details
+    - name: Prompt installation success
       debug:
-        msg: "Initial user created! Username: {{ influxdb_user_response.json.name }}, Token: {{ influxdb_user_response.json.token }}"
-      when: influxdb_user_response is defined and influxdb_user_response.status == 200
+        msg: "InfluxDB installation, user setup, and verification successful."
+      when: '"gpg: Good signature from \\"InfluxDB Packaging Service <support@influxdb.com>\\" [unknown]" in signature_verification_result.stdout'
+
+    - name: Create initial user
+      shell: influx -execute "CREATE USER influx_admin WITH PASSWORD 'password' WITH ALL PRIVILEGES"
+      changed_when: false
+
+    - name: Get authentication token
+      shell: influx auth create -n influx_admin -p 'password' --org pms18@HUA --hide-headers | awk '{print $3}'
+      register: auth_token
+
+    - name: Store authentication token to file
+      copy:
+        content: "{{ auth_token.stdout }}"
+        dest: /home/vagrant/.ssh/infdb-token
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+
+# - name: InfluxDB Installation
+#   hosts: infdb-srv-01
+#   remote_user: vagrant
+#   become: true
+#   tasks:
+#     - name: Fetch the InfluxData GPG key
+#       shell: wget -q https://repos.influxdata.com/influxdata-archive_compat.key
+#       args:
+#         chdir: /tmp
+#       register: wget_output
+
+#     - name: Verify the GPG key checksum
+#       shell: echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c /tmp/influxdata-archive_compat.key' | sha256sum -c
+#       register: sha_output
+#       ignore_errors: yes  # Ignore the error temporarily as GPG import might fail on first run
+
+#     - name: Import the GPG key using gpg
+#       shell: cat /tmp/influxdata-archive_compat.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
+#       when: sha_output is success
+
+#     - name: Add InfluxData repository to apt sources list
+#       shell: echo 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main' | sudo tee /etc/apt/sources.list.d/influxdata.list
+#       when: sha_output is success
+
+#     - name: Update the package cache
+#       apt:
+#         update_cache: yes
+
+#     - name: Install InfluxDB 2 OSS
+#       apt:
+#         name: influxdb2
+#         state: present
+     
+#     - name: Start InfluxDB service
+#       service:
+#           name: influxdb
+#           state: started
+#           enabled: yes
+
+#     - name: Check service
+#       shell: sudo ps -ef | grep influx
+#       register: service_status
+#       changed_when: false
+
+#     - name: Create first user and get the authentication token
+#       uri:
+#         url: http://localhost:8086/api/v2/setup
+#         method: POST
+#         body_format: json
+#         headers:
+#           Content-Type: "application/json"
+#         body:
+#           username: infdbadmin
+#           password: password
+#           org: pms18@HUA
+#           bucket: mybucket01
+#       register: influxdb_setup_result
+
+#     - name: Display authentication token
+#       debug:
+#         msg: "Authentication token: {{ influxdb_setup_result.headers.Authorization }}"
+#       tags:
+#         - Influxdb-installation
+
+#     # - name: Set up initial user
+#     #   command: "curl -X POST 'http://localhost:8086/api/v2/setup' -H 'Content-Type: application/json' -d '{\"username\": \"vagrant\", \"password\": \"vagrant\", \"org\": \"pms18@HUA\", \"bucket\": \"mybucket01\"}'"
+#     #   register: influxdb_user_response
+#     #   when: ansible_os_family == 'Debian'
+#     #   tags:
+#     #     - influx_initial_user
+
+#     # - name: Print initial user details
+#     #   debug:
+#     #     msg: "Initial user created! Username: {{ influxdb_user_response.json.name }}, Token: {{ influxdb_user_response.json.token }}"
+#     #   when: influxdb_user_response is defined and influxdb_user_response.status == 200
+
+
+- name: Install Telegraf
+  hosts: tlg-srv-01
+  become: yes
+  tasks:
+    - name: Download the InfluxData GPG key
+      command: wget -q https://repos.influxdata.com/influxdata-archive_compat.key
+
+    - name: Verify the GPG key using sha256sum
+      command: echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c influxdata-archive_compat.key' | sha256sum -c
+
+    - name: Add the GPG key to trusted keys
+      shell: cat influxdata-archive_compat.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
+
+    - name: Add the InfluxData repository to sources.list.d
+      shell: echo 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main' | sudo tee /etc/apt/sources.list.d/influxdata.list
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Telegraf
+      apt:
+        name: telegraf
+        state: present
       
 
 
@@ -111,7 +275,8 @@
       systemd:
         name: influxdb
         state: started   
-    # - name: InfluxDB service enable-start
+    # - name: InfluxDB service enable-start+
+
     #   shell: systemctl enable influxdb && systemctl start influxdb
     #   register: service_status
     #   changed_when: false
