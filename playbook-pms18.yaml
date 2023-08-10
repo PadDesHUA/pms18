@@ -65,6 +65,204 @@
       tags:
         - vagrant_all
 
+- name: Configure and Install ownCloud
+  hosts: oc-srv-01
+  become: yes
+  vars:
+   ansible_python_interpreter: /usr/bin/python3
+  
+  tasks:
+    - name: Add PHP repository
+      apt_repository:
+        repo: ppa:ondrej/php
+        state: present
+      become: yes
+
+    - name: Update and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: yes
+      become: yes
+
+    - name: Install required packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      become: yes
+      loop:
+        - php7.4 
+        - php7.4-intl
+        - php7.4-mysql
+        - php7.4-mbstring
+        - php7.4-imagick
+        - php7.4-igbinary
+        - php7.4-gmp
+        - php7.4-bcmath
+        - php7.4-curl
+        - php7.4-gd 
+        - php7.4-zip
+        - php7.4-imap
+        - php7.4-ldap
+        - php7.4-bz2
+        - php7.4-ssh2
+        - php7.4-common
+        - php7.4-json
+        - php7.4-xml
+        - php7.4-dev
+        - php7.4-apcu
+        - php7.4-redis
+        - libsmbclient-dev
+        - php-pear
+        - php-phpseclib
+        - smbclient
+        - redis-server
+        - unzip
+        - openssl
+        - rsync
+        - imagemagick
+        - libapache2-mod-php7.4
+        - apache2
+        - mariadb-server
+        - mariadb-client
+        - python3-mysql.connector 
+
+    - name: Set PHP alternatives
+      command: "sudo update-alternatives --set {{ item }}"
+      loop:
+        - "php /usr/bin/php7.4"
+        - "phar /usr/bin/phar7.4"
+        - "phar.phar /usr/bin/phar.phar7.4"
+        - "phpize /usr/bin/phpize7.4"
+        - "php-config /usr/bin/php-config7.4"
+
+    - name: Create smbclient.ini
+      block:
+        - name: Creat file 
+          shell: touch "/etc/php/7.4/mods-available/smbclient.ini"
+        - name: Append file
+          lineinfile:
+            path: "/etc/php/7.4/mods-available/smbclient.ini"
+            line: "extension=smbclient.so"
+          become: yes
+
+    - name: Enable smbclient module
+      command: "sudo phpenmod smbclient"
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+      become: yes
+
+    - name: Create MariaDB root user
+      mysql_user:
+        name: root
+        host: localhost
+        password: "password"
+        priv: "*.*:ALL,GRANT"
+      become: yes
+      ignore_errors: yes
+
+    - name: Create ownCloud database and user
+      mysql_db:
+        name: owncloud
+        state: present
+      become: yes
+      ignore_errors: yes
+
+    - name: Grant privileges to ownCloud user
+      mysql_user:
+        name: ocuser
+        host: localhost
+        password: ocpassword
+        priv: "owncloud.*:ALL"
+      become: yes
+      ignore_errors: yes
+
+    - name: Download and verify ownCloud
+      block:
+        - name: Download ownCloud
+          shell: wget "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2"
+
+        # - name: Download ownCloud
+        #   get_url:
+        #     url: "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2"
+        #     dest: "/tmp/owncloud-complete-latest.tar.bz2"
+
+        - name: Download keyfile
+          get_url:
+            url: "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2.sha256"
+            dest: "/tmp/owncloud-complete-latest.tar.bz2.sha256"
+          ignore_errors: yes
+
+        - name: Verify key file
+          shell: "sha256sum -c owncloud-complete-latest.tar.bz2.sha256 < owncloud-complete-latest.tar.bz2"
+          args:
+            chdir: "/tmp"
+          register: sha_verification
+          failed_when: sha_verification.rc != 0
+          ignore_errors: yes
+
+    - name: Unzip owncloud
+      shell: |
+        tar -xjvf owncloud-complete-latest.tar.bz2 
+        sudo cp -r owncloud /var/www/
+    # - name: Unzip ownCloud
+    #   unarchive:
+    #     src: "/tmp/owncloud-complete-latest.tar.bz2"
+    #     dest: "/var/www/"
+    #     extra_opts: ['--strip-components=1']
+    #   when: sha_verification.rc == 0
+
+    - name: Set permissions
+      file:
+        path: "/var/www/owncloud"
+        owner: www-data
+        group: www-data
+        recurse: yes
+      become: yes
+
+- name: Initial ownCloud Configuration
+  hosts: oc-srv-01
+  become: yes
+
+  tasks:
+    - name: Set data folder permissions
+      file:
+        path: "/var/www/owncloud/data"
+        owner: www-data
+        group: www-data
+        recurse: yes
+      tags: ['setup']
+
+    - name: Configure ownCloud
+      shell: |
+        sudo -u www-data php /var/www/owncloud/occ maintenance:install \
+        --database "mysql" \
+        --database-name "owncloud" \
+        --database-user "ocuser" \
+        --database-pass "ocpassword" \
+        --admin-user "admin" \
+        --admin-pass "{{ owncloud_admin_password }}"
+      args:
+        executable: /bin/bash
+      register: owncloud_setup
+      environment:
+        OC_PASS: "{{ owncloud_admin_password }}"
+      tags: ['setup']
+
+    - name: Display ownCloud setup result
+      debug:
+        var: owncloud_setup.stdout_lines
+
+    - name: Restart Apache (and PHP)
+      service:
+        name: apache2
+        state: restarted
+      become: yes
+
+
+
 - name: Install InfluxDB
   hosts: infdb-srv-01
   become: yes
@@ -172,7 +370,7 @@
         state: present
       
 - name: Install and configure Grafana
-  hosts: your_remote_host
+  hosts: grf-srv-01
   become: true
   tasks:
     - name: Install prerequisites
@@ -183,18 +381,21 @@
         - apt-transport-https
         - software-properties-common
         - wget
-
+    
     - name: Add Grafana GPG key
       shell: |
-        sudo wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key
+        sudo wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key --no-check-certificate
       changed_when: false  # Assuming the key doesn't change frequently
 
     - name: Add Grafana repository
-      blockinfile:
-        path: /etc/apt/sources.list.d/grafana.list
-        block: |
-          deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main
-          deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com beta main
+      shell: |
+        echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
+
+      # blockinfile:
+      #   path: /etc/apt/sources.list.d/grafana.list
+      #   block: |
+      #     deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main
+      #     deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com beta main
 
     - name: Update package cache
       apt:
@@ -204,6 +405,7 @@
       apt:
         name: grafana
         state: present
+        allow_unauthenticated: yes  # Allow installation of unauthenticated packages
 
     - name: Reload systemd
       systemd:
@@ -216,15 +418,13 @@
         enabled: yes
 
     - name: Check Grafana service status
-      systemd:
-        name: grafana-server
-        state: status
-
+      shell: | 
+        sudo systemctl status grafana-server
 
 
 
   handlers:
     - name: Start InfluxDB service
       systemd:
-        name: influxdb
-        state: started
+          name: influxdb
+          state: started

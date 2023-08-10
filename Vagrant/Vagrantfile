@@ -6,7 +6,7 @@ Vagrant.configure("2") do |config|
       vb.memory = "1024"
     end
   
-    config.vm.define "control", primary: true do |node|
+    config.vm.define "control", override: true, primary: true do |node|
       node.vm.box = "envimation/ubuntu-xenial"
       node.vm.hostname = "control"
       node.vm.network "private_network", ip: "192.168.56.10"
@@ -33,8 +33,8 @@ Vagrant.configure("2") do |config|
       SCRIPT
     end
 
-    config.vm.define "oc-srv-01", primary: true do |node|
-      node.vm.box = "envimation/ubuntu-xenial"
+    config.vm.define "oc-srv-01", override: true do |node|
+      node.vm.box = "ubuntu/jammy64"
       node.vm.hostname = "oc-srv-01"
       node.vm.network "private_network", ip: "192.168.56.20"
       node.vm.provider :virtualbox do |vb|
@@ -47,7 +47,7 @@ Vagrant.configure("2") do |config|
       SHELL
     end
 
-    config.vm.define "infdb-srv-01", primary: true do |node|
+    config.vm.define "infdb-srv-01", override: true, primary: true do |node|
       node.vm.box = "ubuntu/jammy64"
       node.vm.hostname = 'infdb-srv-01'
       node.vm.network "private_network", ip: "192.168.56.30"
@@ -65,7 +65,7 @@ Vagrant.configure("2") do |config|
       SHELL
     end
 
-    config.vm.define "grf-srv-01", primary: true do |node|
+    config.vm.define "grf-srv-01", override: true do |node|
       node.vm.box = "envimation/ubuntu-xenial"
       node.vm.hostname = 'grf-srv-01'
       node.vm.network "private_network", ip: "192.168.56.40"
@@ -79,7 +79,7 @@ Vagrant.configure("2") do |config|
       SHELL
     end
 
-    config.vm.define "tlg-srv-01", primary: true do |node|
+    config.vm.define "tlg-srv-01", override: true do |node|
       node.vm.box = "envimation/ubuntu-xenial"
       node.vm.hostname = 'tlg-srv-01'
       node.vm.network "private_network", ip: "192.168.56.50"
