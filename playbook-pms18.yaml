@@ -181,13 +181,13 @@
 
     - name: Download and verify ownCloud
       block:
-        - name: Download ownCloud
-          shell: wget "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2"
-
         # - name: Download ownCloud
-        #   get_url:
-        #     url: "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2"
-        #     dest: "/tmp/owncloud-complete-latest.tar.bz2"
+        #   shell: wget "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2"
+
+        - name: Download ownCloud
+          get_url:
+            url: "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2"
+            dest: "/tmp/owncloud-complete-latest.tar.bz2"
 
         - name: Download keyfile
           get_url:
@@ -203,16 +203,16 @@
           failed_when: sha_verification.rc != 0
           ignore_errors: yes
 
-    - name: Unzip owncloud
-      shell: |
-        tar -xjvf owncloud-complete-latest.tar.bz2 
-        sudo cp -r owncloud /var/www/
-    # - name: Unzip ownCloud
-    #   unarchive:
-    #     src: "/tmp/owncloud-complete-latest.tar.bz2"
-    #     dest: "/var/www/"
-    #     extra_opts: ['--strip-components=1']
-    #   when: sha_verification.rc == 0
+    # - name: Unzip owncloud
+    #   shell: |
+    #     tar -xjvf owncloud-complete-latest.tar.bz2 
+    #     sudo cp -r owncloud /var/www/
+    - name: Unzip ownCloud
+      unarchive:
+        src: "/tmp/owncloud-complete-latest.tar.bz2"
+        dest: "/var/www/"
+        extra_opts: ['--strip-components=1']
+      when: sha_verification.rc == 0
 
     - name: Set permissions
       file:
@@ -225,6 +225,9 @@
 - name: Initial ownCloud Configuration
   hosts: oc-srv-01
   become: yes
+
+  vars:
+    owncloud_admin_password: "ocpassword" 
 
   tasks:
     - name: Set data folder permissions
@@ -242,7 +245,7 @@
         --database-name "owncloud" \
         --database-user "ocuser" \
         --database-pass "ocpassword" \
-        --admin-user "admin" \
+        --admin-user "ocuser" \
         --admin-pass "{{ owncloud_admin_password }}"
       args:
         executable: /bin/bash
