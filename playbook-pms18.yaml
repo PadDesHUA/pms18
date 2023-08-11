@@ -39,7 +39,11 @@
     - name: Execute Ansible playbook based on user choice
       include_tasks: "{{ user_vm_choice.user_input }}.yaml"
       when: user_vm_choice.user_input != 'all' and user_playbook_choice.user_input == 'yes'
-
+      # delegate_to: oc-srv-01
+      vars: 
+        ansible_connection: ssh
+        ansible_user: vagrant
+        ansible_host: oc-srv-01
 
 
 

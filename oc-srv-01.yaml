@@ -1,217 +1,263 @@
 ---
-- name: Configure and Install ownCloud
-  hosts: oc-srv-01
+# - name: Configure and Install ownCloud
+#   hosts: oc-srv-01
+#   become: yes
+#   vars:
+#    ansible_python_interpreter: /usr/bin/python3
+   
+- name: Add PHP repository
+  apt_repository:
+    repo: ppa:ondrej/php
+    state: present
   become: yes
-  vars:
-   ansible_python_interpreter: /usr/bin/python3
-  
-  tasks:
-    - name: Add PHP repository
-      apt_repository:
-        repo: ppa:ondrej/php
-        state: present
+#   register: task_results
+
+# - name: print task task_results
+#   debug:
+#     var: task_results
+
+- name: Update and upgrade packages
+  apt:
+    update_cache: yes
+    upgrade: yes
+  become: yes
+
+- name: Install required packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  become: yes
+  loop:
+    - php7.4 
+    - php7.4-intl
+    - php7.4-mysql
+    - php7.4-mbstring
+    - php7.4-imagick
+    - php7.4-igbinary
+    - php7.4-gmp
+    - php7.4-bcmath
+    - php7.4-curl
+    - php7.4-gd 
+    - php7.4-zip
+    - php7.4-imap
+    - php7.4-ldap
+    - php7.4-bz2
+    - php7.4-ssh2
+    - php7.4-common
+    - php7.4-json
+    - php7.4-xml
+    - php7.4-dev
+    - php7.4-apcu
+    - php7.4-redis
+    - libsmbclient-dev
+    - php-pear
+    - php-phpseclib
+    - smbclient
+    - redis-server
+    - php-redis
+    - python3-mysqldb
+    - unzip
+    - openssl
+    - rsync
+    - imagemagick
+    - libapache2-mod-php7.4
+    - apache2
+    - mariadb-server
+    - mariadb-client
+    - python3-mysql.connector 
+
+- name: Set PHP alternatives
+  command: "sudo update-alternatives --set {{ item }}"
+  loop:
+    - "php /usr/bin/php7.4"
+    - "phar /usr/bin/phar7.4"
+    - "phar.phar /usr/bin/phar.phar7.4"
+    - "phpize /usr/bin/phpize7.4"
+    - "php-config /usr/bin/php-config7.4"
+
+- name: Create smbclient.ini
+  block:
+    - name: Creat file 
+      shell: touch "/etc/php/7.4/mods-available/smbclient.ini"
+    - name: Append file
+      lineinfile:
+        path: "/etc/php/7.4/mods-available/smbclient.ini"
+        line: "extension=smbclient.so"
       become: yes
 
-    - name: Update and upgrade packages
-      apt:
-        update_cache: yes
-        upgrade: yes
+- name: Enable smbclient module
+  command: "sudo phpenmod smbclient"
+
+- name: Restart Apache
+  service:
+    name: apache2
+    state: restarted
+  become: yes
+
+- name: Create dbadmin user
+  mysql_user:
+    name: dbadmin
+    password: password
+    priv: '*.*:ALL'
+    host: localhost
+    state: present
+  become: true
+
+- name: Create owncloud database
+  mysql_db:
+    name: owncloud
+    state: present
+  become: true
+
+- name: Create ocuser user
+  mysql_user:
+    name: ocuser
+    password: ocpassword
+    priv: '*.*:ALL'
+    host: localhost
+    state: present
+  become: true
+
+- name: Grant privileges on owncloud database to ocuser
+  mysql_user:
+    name: ocuser
+    password: ocpassword
+    priv: 'owncloud.*:ALL'
+    host: localhost
+    state: present
+  become: true
+
+- name: Exit MySQL prompt
+  command: mysql -u root -e "exit"
+  ignore_errors: yes
+
+- name: Download and verify ownCloud
+  block:
+
+    - name: Download ownCloud
+      get_url:
+        url: "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2"
+        dest: "/tmp/owncloud-complete-latest.tar.bz2"
+
+    - name: Download keyfile
+      get_url:
+        url: "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2.sha256"
+        dest: "/tmp/owncloud-complete-latest.tar.bz2.sha256"
+      ignore_errors: yes
+
+    - name: Verify key file
+      shell: "sha256sum -c owncloud-complete-latest.tar.bz2.sha256 < owncloud-complete-latest.tar.bz2"
+      args:
+        chdir: "/tmp"
+      register: sha_verification
+      failed_when: sha_verification.rc != 0
+      ignore_errors: yes
+
+    - name: Unzip owncloud
+      args:
+        chdir: "/tmp"
+      shell: |
+        tar -xjvf owncloud-complete-latest.tar.bz2 
+        sudo cp -r owncloud /var/www/
+    
+    - name: Set permissions
+      file:
+        path: "/var/www/owncloud"
+        owner: www-data
+        group: www-data
+        recurse: yes
       become: yes
+      ignore_errors: yes
+    
+    - name: Create owncloud.conf file
+      file:
+        path: /etc/apache2/sites-available/owncloud.conf
+        state: touch
 
-    - name: Install required packages
-      apt:
-        name: "{{ item }}"
-        state: present
-      become: yes
-      loop:
-        - php7.4 
-        - php7.4-intl
-        - php7.4-mysql
-        - php7.4-mbstring
-        - php7.4-imagick
-        - php7.4-igbinary
-        - php7.4-gmp
-        - php7.4-bcmath
-        - php7.4-curl
-        - php7.4-gd 
-        - php7.4-zip
-        - php7.4-imap
-        - php7.4-ldap
-        - php7.4-bz2
-        - php7.4-ssh2
-        - php7.4-common
-        - php7.4-json
-        - php7.4-xml
-        - php7.4-dev
-        - php7.4-apcu
-        - php7.4-redis
-        - libsmbclient-dev
-        - php-pear
-        - php-phpseclib
-        - smbclient
-        - redis-server
-        - php-redis
-        - python3-mysqldb
-        - unzip
-        - openssl
-        - rsync
-        - imagemagick
-        - libapache2-mod-php7.4
-        - apache2
-        - mariadb-server
-        - mariadb-client
-        - python3-mysql.connector 
+    - name: Update owncloud.conf
+      blockinfile:
+        path: /etc/apache2/sites-available/owncloud.conf
+        content: |
+          Alias /owncloud "/var/www/owncloud/"
 
-    - name: Set PHP alternatives
-      command: "sudo update-alternatives --set {{ item }}"
-      loop:
-        - "php /usr/bin/php7.4"
-        - "phar /usr/bin/phar7.4"
-        - "phar.phar /usr/bin/phar.phar7.4"
-        - "phpize /usr/bin/phpize7.4"
-        - "php-config /usr/bin/php-config7.4"
+          <Directory /var/www/owncloud/>
+            Options +FollowSymlinks
+            AllowOverride All
+            <IfModule mod_dav.c>
+              Dav off
+            </IfModule>
+          </Directory>
 
-    - name: Create smbclient.ini
-      block:
-        - name: Creat file 
-          shell: touch "/etc/php/7.4/mods-available/smbclient.ini"
-        - name: Append file
-          lineinfile:
-            path: "/etc/php/7.4/mods-available/smbclient.ini"
-            line: "extension=smbclient.so"
-          become: yes
+    - name: Create symlink for owncloud.conf
+      file:
+        src: /etc/apache2/sites-available/owncloud.conf
+        dest: /etc/apache2/sites-enabled/owncloud.conf
+        state: link
 
-    - name: Enable smbclient module
-      command: "sudo phpenmod smbclient"
-
-    - name: Restart Apache
+    - name: Restart Apache service
       service:
         name: apache2
         state: restarted
-      become: yes
 
-    - name: Create dbadmin user
-      mysql_user:
-        name: dbadmin
-        password: password
-        priv: '*.*:ALL'
-        host: localhost
+    - name: Install smbclient
+      package:
+        name: smbclient
         state: present
-      become: true
-
-    - name: Create owncloud database
-      mysql_db:
-        name: owncloud
-        state: present
-      become: true
-
-    - name: Create ocuser user
-      mysql_user:
-        name: ocuser
-        password: ocpassword
-        priv: '*.*:ALL'
-        host: localhost
-        state: present
-      become: true
-
-    - name: Grant privileges on owncloud database to ocuser
-      mysql_user:
-        name: ocuser
-        password: ocpassword
-        priv: 'owncloud.*:ALL'
-        host: localhost
-        state: present
-      become: true
-
-    - name: Exit MySQL prompt
-      command: mysql -u root -e "exit"
-      ignore_errors: yes
-
-    - name: Download and verify ownCloud
-      block:
-        # - name: Download ownCloud
-        #   shell: wget "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2"
-
-        - name: Download ownCloud
-          get_url:
-            url: "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2"
-            dest: "/tmp/owncloud-complete-latest.tar.bz2"
-
-        - name: Download keyfile
-          get_url:
-            url: "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2.sha256"
-            dest: "/tmp/owncloud-complete-latest.tar.bz2.sha256"
-          ignore_errors: yes
-
-        - name: Verify key file
-          shell: "sha256sum -c owncloud-complete-latest.tar.bz2.sha256 < owncloud-complete-latest.tar.bz2"
-          args:
-            chdir: "/tmp"
-          register: sha_verification
-          failed_when: sha_verification.rc != 0
-          ignore_errors: yes
-
-        - name: Unzip owncloud
-          shell: |
-            tar -xjvf owncloud-complete-latest.tar.bz2 
-            sudo cp -r owncloud /var/www/
-
-        # - name: Unzip ownCloud
-        #   unarchive:
-        #     src: "/tmp/owncloud-complete-latest.tar.bz2"
-        #     dest: "/var/www/"
-        #     extra_opts: ['--strip-components=1']
-        #   become: yes
-        #   when: sha_verification.rc == 0
-        #   ignore_errors: yes
-
         
-        - name: Set permissions
-          file:
-            path: "/var/www/owncloud"
-            owner: www-data
-            group: www-data
-            recurse: yes
-          become: yes
-          ignore_errors: yes
+    - name: Enable smbclient PHP extension
+      lineinfile:
+        dest: "/etc/php/7.4/cli/php.ini"
+        regexp: '^;?extension=smbclient\.so$'
+        line: 'extension=smbclient.so'
+      # notify:
+      #   - Restart PHP Service
 
-        - name: Install smbclient
-          package:
-            name: smbclient
-            state: present
-            
-        - name: Enable smbclient PHP extension
-          lineinfile:
-            dest: "/etc/php/{{ php_version }}/cli/php.ini"
-            regexp: '^;?extension=smbclient\.so$'
-            line: 'extension=smbclient.so'
-          notify:
-            - Restart PHP Service
-
-        - name: Ensure occ script path
-          shell: >
-            cd /var/www/owncloud &&
-            ln -s /var/www/owncloud/occ occ
-          args:
-            executable: /bin/bash
-          ignore_errors: yes
-
-        - name: Run occ maintenance:install
-          shell: >
-            sudo -u www-data php /var/www/owncloud/occ maintenance:install
-            --database "mysql"
-            --database-name "owncloud"
-            --database-user "ocuser"
-            --database-pass "ocpassword"
-            --admin-user "ocuser"
-            --admin-pass "ocpassword"
-          args:
-            executable: /bin/bash
-          become: yes
-          ignore_errors: yes
-
-  handlers:
     - name: Restart PHP Service
       systemd:
-        name: php{{ php_version }}-fpm
+        name: php7.4-fpm
         state: restarted
+    
+
+    - name: Ensure occ script path
+      shell: |
+        cd /var/www/
+        ln -s /var/www/owncloud/occ occ
+      args:
+        executable: /bin/bash
+      become: yes
+      ignore_errors: yes
+      
+
+    - name: Update config.php
+      replace:
+        path: /var/www/owncloud/config/config.php
+        regexp: "'localhost'"
+        replace: "'oc-srv-01'"
+      become: yes
+                
+    - name: Restart Apache service
+      service:
+        name: apache2
+        state: restarted
+
+    - name: Run occ maintenance:install
+      args:
+        chdir: "/var/www/owncloud/"
+      shell: |
+        sudo -u www-data php occ maintenance:install \
+          --database "mysql" \
+          --database-name "owncloud" \
+          --database-user "ocuser" \
+          --database-pass "ocpassword" \
+          --admin-user "ocuser" \
+          --admin-pass "ocpassword"
+      become: yes
+      ignore_errors: yes
+      tags:
+        - occ user
+        
+# handlers:
+#   - name: Restart PHP Service
+#     systemd:
+#       name: php7.4-fpm
+#       state: restarted
