@@ -3,36 +3,42 @@
   hosts: localhost
   gather_facts: no
   # vars:
-  #   vagrant_folder: "/home/itp22109/pms18/Vagrant"
+  #   vagrant_folder: "./Vagrant"
   #   vagrant_status_command: "cd {{ vagrant_folder }} && vagrant status | awk '{print $1}' | awk 'NR>2' | head -n -3"
-  tasks: 
+  tasks:
     - name: Get Vagrant VMs
       shell: |
-        cd /home/itp22109/pms18/Vagrant
+        cd /home/itp22109/pms18/Vagrant/
         vagrant status | awk '{print $1}' | awk 'NR>2' | head -n -3
       register: vagrant_output
 
     - name: Extract VM names
       set_fact:
-        vm_names: "{{ vagrant_output.stdout_lines }}"
+        vm_names: "{{ vagrant_output.stdout_lines + ['all'] }}"
 
     - name: Display VM choices
       debug:
         msg: "Select a VM: {{ vm_names }}"
 
-    - name: User Input
+    - name: User Input for VM choice
       pause:
         prompt: "Choose a VM from the list above"
-      register: user_choice
+      register: user_vm_choice
 
-    - name: Execute tasks on selected VM
-      debug:
-        msg: "You chose: {{ user_choice.user_input }}"
+    - name: Execute vagrant up for selected VM
+      shell: |
+       cd /home/itp22109/pms18/Vagrant/
+       vagrant up {{ user_vm_choice.user_input }}
+      when: user_vm_choice.user_input != 'all'
 
-      # You can replace the debug task with your actual tasks that use the selected VM name.
-      # For example:
-      # - name: Execute tasks on selected VM
-      #   shell: "ansible-playbook -i {{ user_choice.user_input }}, your_tasks.yml"
+    - name: User Input for Playbook choice
+      pause:
+        prompt: "Do you want to run the Ansible playbook on the selected VM? (yes/no)"
+      register: user_playbook_choice
+
+    - name: Execute Ansible playbook based on user choice
+      include_tasks: "{{ user_vm_choice.user_input }}.yaml"
+      when: user_vm_choice.user_input != 'all' and user_playbook_choice.user_input == 'yes'
 
 
 
@@ -93,14 +99,6 @@
   tasks:
     - name: Append /etc/hosts entries
       shell: cat /vagrant/pms18_hosts >> /etc/hosts
-
-- name: Execute tasks based on selected VM
-  hosts: localhost
-  gather_facts: no
-  tasks:
-    - name: Include tasks for selected VM
-      include_tasks: "{{ selected_vm.user_input }}_tasks.yml"
-
 
 - name: Install necessary packages at control station
   hosts: control

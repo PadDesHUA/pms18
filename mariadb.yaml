@@ -1,0 +1,47 @@
+---
+- name: Configure MariaDB
+  hosts: oc-srv-01
+  become: true
+  tasks:
+    - name: Install MySQL Python library
+      apt:
+        name: python3-mysqldb
+        state: present
+      become: true
+
+    - name: Create dbadmin user
+      mysql_user:
+        name: dbadmin
+        password: password
+        priv: '*.*:ALL'
+        host: localhost
+        state: present
+      become: true
+
+    - name: Create owncloud database
+      mysql_db:
+        name: owncloud
+        state: present
+      become: true
+
+    - name: Create ocuser user
+      mysql_user:
+        name: ocuser
+        password: ocpassword
+        priv: '*.*:ALL'
+        host: localhost
+        state: present
+      become: true
+
+    - name: Grant privileges on owncloud database to ocuser
+      mysql_user:
+        name: ocuser
+        password: ocpassword
+        priv: 'owncloud.*:ALL'
+        host: localhost
+        state: present
+      become: true
+
+    - name: Exit MySQL prompt
+      command: mysql -u root -e "exit"
+      ignore_errors: yes

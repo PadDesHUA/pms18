@@ -1,0 +1,81 @@
+---
+- name: Configure OwnCloud Dependencies and Install
+  hosts: oc-srv-01
+  become: true
+  vars:
+    php_version: "7.4"  
+
+  tasks:
+    - name: Install smbclient
+      package:
+        name: smbclient
+        state: present
+
+    - name: Enable smbclient PHP extension
+      lineinfile:
+        dest: "/etc/php/{{ php_version }}/cli/php.ini"
+        regexp: '^;?extension=smbclient\.so$'
+        line: 'extension=smbclient.so'
+      notify:
+        - Restart PHP Service
+
+    - name: Ensure occ script path
+      shell: >
+        cd /var/www/owncloud &&
+        ln -s /var/www/owncloud/occ occ
+      args:
+        executable: /bin/bash
+      ignore_errors: yes
+
+    - name: Run occ maintenance:install
+      shell: >
+        sudo -u www-data php /var/www/owncloud/occ maintenance:install
+        --database "mysql"
+        --database-name "owncloud"
+        --database-user "ocuser"
+        --database-pass "ocpassword"
+        --admin-user "ocuser"
+        --admin-pass "ocpassword"
+      args:
+        executable: /bin/bash
+      become: yes
+
+  handlers:
+    - name: Restart PHP Service
+      systemd:
+        name: php{{ php_version }}-fpm
+        state: restarted
+
+
+
+# ---
+# - name: Configure OwnCloud Dependencies
+#   hosts: oc-srv-01
+#   become: true
+#   tasks:
+#     - name: Install smbclient
+#       package:
+#         name: smbclient
+#         state: present
+
+#     - name: Enable smbclient PHP extension
+#       lineinfile:
+#         dest: /etc/php/{your_php_version}/cli/php.ini
+#         regexp: '^;?extension=smbclient\.so$'
+#         line: 'extension=smbclient.so'
+#       notify:
+#         - Restart PHP Service
+
+#     - name: Ensure occ script path
+#       shell: >
+#         cd /var/www/owncloud &&
+#         ln -s /path/to/owncloud/occ occ
+#       args:
+#         executable: /bin/bash
+#       ignore_errors: yes
+
+#   handlers:
+#     - name: Restart PHP Service
+#       systemd:
+#         name: php{{ your_php_version }}-fpm
+#         state: restarted
