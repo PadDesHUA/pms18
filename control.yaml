@@ -1,0 +1,28 @@
+---
+# - name: Install necessary packages at control station
+#   hosts: control
+#   remote_user: vagrant
+#   become: true
+#   tasks:
+    - name: Update apt update_cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
+      tags:
+        - update_apt_cache
+
+    - name: Install packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - vagrant
+        - virtualbox
+        - virtualbox-ext-pack
+        - virtualbox-qt
+        - ansible
+      when: ansible_os_family == 'Debian'
+      ignore_errors: yes
+      tags:
+        - install_packages
+
