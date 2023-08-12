@@ -21,15 +21,18 @@
       shell: echo 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main' | sudo tee /etc/apt/sources.list.d/influxdata.list
 
     - name: Update apt cache
+      become: yes
       apt:
         update_cache: yes
 
     - name: Install InfluxDB
+      become: yes
       apt:
         name: influxdb
         state: present
 
     - name: Start InfluxDB service
+      become: yes
       service:
         name: influxdb
         state: started
@@ -51,6 +54,7 @@
       ignore_errors: yes
 
     - name: Import InfluxData public key for verification
+      become: yes
       command: gpg --import /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg
 
     - name: Verify signature
@@ -73,6 +77,7 @@
       register: auth_token
 
     - name: Store authentication token to file
+      become: yes
       copy:
         content: "{{ auth_token.stdout }}"
         dest: /home/vagrant/.ssh/infdb-token

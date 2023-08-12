@@ -1,6 +1,11 @@
 Vagrant.configure("2") do |config|
     config.hostmanager.enabled = true
   
+    if Vagrant.has_plugin?("vagrant-vbguest") then
+      config.vbguest.auto_update = false # Enable the VBoxGuestAdditions plugin
+      config.vbguest.no_remote = false # This prevents remote installation, speeding up provisioning
+    end
+
     config.vm.provider "virtualbox" do |vb|
       vb.gui = false
       vb.memory = "1024"

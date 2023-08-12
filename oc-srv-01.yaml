@@ -306,6 +306,12 @@
   ignore_errors: yes
   tags:
     - config_php
+
+- name: Repair config.php
+  shell: |
+    sed -i '14{s/oc-srv-01/localhost/}' /var/www/owncloud/config/config.php
+  become: yes
+
         
 # handlers:
 #   - name: Restart PHP Service
