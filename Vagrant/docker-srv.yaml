@@ -1,0 +1,33 @@
+---
+- name: Setup Docker containers for ownCloud, InfluxDB, Grafana, and Telegraf
+  hosts: localhost
+  become: true
+  tasks:
+    - name: Update apt cache (for Debian/Ubuntu)
+      apt:
+        update_cache: yes
+      
+
+    - name: Install required packages
+      apt:
+        name:
+          - docker.io
+          - docker-compose
+        state: present
+      
+
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Copy docker-compose file
+      shell: |
+        cp /vagrant/docker-compose.yaml /home/vagrant/docker-compose.yaml
+      
+
+    - name: Start Docker containers
+      command: "docker-compose up -d"
+      args:
+        chdir: /home/vagrant  # Path where docker-compose.yml is located on the remote server

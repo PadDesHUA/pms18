@@ -5,13 +5,14 @@
 #   become: true
 #   tasks:
     - name: Update apt update_cache
+      become: yes
       apt:
         update_cache: yes
-      when: ansible_os_family == 'Debian'
       tags:
         - update_apt_cache
 
     - name: Install packages
+      become: yes
       apt:
         name: "{{ item }}"
         state: present
@@ -21,7 +22,6 @@
         - virtualbox-ext-pack
         - virtualbox-qt
         - ansible
-      when: ansible_os_family == 'Debian'
       ignore_errors: yes
       tags:
         - install_packages

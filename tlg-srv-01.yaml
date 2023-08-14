@@ -16,10 +16,112 @@
       shell: echo 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main' | sudo tee /etc/apt/sources.list.d/influxdata.list
 
     - name: Update apt cache
+      become: yes
       apt:
         update_cache: yes
 
     - name: Install Telegraf
+      become: yes
       apt:
         name: telegraf
         state: present
+    
+    - name: Create a copy of telegraf.conf if not exists
+      become: yes
+      ansible.builtin.stat:
+        path: /etc/telegraf/telegraf.conf.orig
+      register: telegraf_conf_orig
+
+    - name: Create a copy of telegraf.conf
+      become: yes
+      shell: |
+        cp /etc/telegraf/telegraf.conf /etc/telegraf/telegraf.conf.orig
+      when: not telegraf_conf_orig.stat.exists
+
+    - name: Copy telegraf.conf from Control Station
+      become: yes
+      shell: |
+        cp /vagrant/telegraf.conf /etc/telegraf/telegraf.conf
+    
+    - name: Make folder and file for outputs.file
+      become: yes
+      shell: |
+        mkdir /temp
+        touch /temp/metrics.out
+    
+    - name: Restart Telegraf service
+      service:
+        name: telegraf
+        state: restarted
+      become: yes
+
+    # - name: Set the user_vm_choice variable
+    #   set_fact:
+    #     user_vm_choice: infdb-srv-01
+
+    # - name: Test Influxdb database task_results
+    #   become: yes
+    #   # delegate_to: infdb-srv-01
+    #   shell: |
+    #     influx -precision rfc3339 -database telegraf -execute 'SELECT * from cpu' -format 'csv' -pretty
+    #   register: command_output
+    #   changed_when: false   # Prevent Ansible from marking the task as changed
+    
+    # - name: Display the command output
+    #   debug:
+    #     var: command_output.stdout_lines
+            
+
+    # - name: Modify telegraf.conf
+    #   become: yes
+    #   block:
+    #     - name: Uncomment [[ outputs.file ]]
+    #       shell: |
+    #         sed -i '976{s/oc-srv-01/localhost/}' /var/www/owncloud/config/config.php
+    #       become: yes
+    #       lineinfile:
+    #         path: /etc/telegraf/telegraf.conf
+    #         regexp: '^#\s*\[\[ outputs\.file \]\]'
+    #         line: '[[ outputs.file ]]'
+
+    #     - name: Uncomment and configure files in [[ outputs.file ]]
+    #       lineinfile:
+    #         path: /etc/telegraf/telegraf.conf
+    #         regexp: '^#?\s*files = \["stdout", "/temp/metrics\.out"\]'
+    #         line: 'files = ["/temp/metrics.out"]'
+
+    #     - name: Uncomment rotation_interval in [[ outputs.file ]]
+    #       lineinfile:
+    #         path: /etc/telegraf/telegraf.conf
+    #         regexp: '^#?\s*rotation_interval = ".*"'
+    #         line: 'rotation_interval = "1h"'
+
+    #     - name: Uncomment [[ outputs.influxdb ]]
+    #       lineinfile:
+    #         path: /etc/telegraf/telegraf.conf
+    #         regexp: '^#\s*\[\[ outputs\.influxdb \]\]'
+    #         line: '[[ outputs.influxdb ]]'
+
+    #     - name: Uncomment and configure urls in [[ outputs.influxdb ]]
+    #       lineinfile:
+    #         path: /etc/telegraf/telegraf.conf
+    #         regexp: '^#?\s*urls = \["https://127\.0\.0\.1:8086"\]'
+    #         line: 'urls = ["https://infdb-srv-01:8086"]'
+
+    #     - name: Uncomment database in [[ outputs.influxdb ]]
+    #       lineinfile:
+    #         path: /etc/telegraf/telegraf.conf
+    #         regexp: '^#?\s*database = ".*"'
+    #         line: 'database = "telegraf"'
+
+    #     - name: Configure default_tag
+    #       lineinfile:
+    #         path: /etc/telegraf/telegraf.conf
+    #         regexp: '^default_tag ='
+    #         line: 'default_tag = ""'
+
+    #     - name: Configure retention_policy
+    #       lineinfile:
+    #         path: /etc/telegraf/telegraf.conf
+    #         regexp: '^retention_policy ='
+    #         line: 'retention_policy = ""'

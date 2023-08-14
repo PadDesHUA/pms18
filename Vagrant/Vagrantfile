@@ -12,12 +12,13 @@ Vagrant.configure("2") do |config|
     end
   
     config.vm.define "control", override: true, primary: true do |node|
-      node.vm.box = "envimation/ubuntu-xenial"
+      node.vm.box = "ubuntu/jammy64"
       node.vm.hostname = "control"
       node.vm.network "private_network", ip: "192.168.56.10"
       node.vm.provider :virtualbox do |vb|
         vb.name = "Control Station"
         vb.cpus = 1
+        vb.memory = "4096"
       end
 
       node.vm.provision :shell, :inline => <<-SCRIPT
@@ -71,7 +72,7 @@ Vagrant.configure("2") do |config|
     end
 
     config.vm.define "grf-srv-01", override: true do |node|
-      node.vm.box = "envimation/ubuntu-xenial"
+      node.vm.box = "ubuntu/jammy64"
       node.vm.hostname = 'grf-srv-01'
       node.vm.network "private_network", ip: "192.168.56.40"
       node.vm.provider :virtualbox do |vb|
@@ -85,7 +86,8 @@ Vagrant.configure("2") do |config|
     end
 
     config.vm.define "tlg-srv-01", override: true do |node|
-      node.vm.box = "envimation/ubuntu-xenial"
+      #node.vm.box = "envimation/ubuntu-xenial"
+      node.vm.box = "ubuntu/jammy64"
       node.vm.hostname = 'tlg-srv-01'
       node.vm.network "private_network", ip: "192.168.56.50"
       node.vm.provider :virtualbox do |vb|

@@ -43,7 +43,7 @@
       vars: 
         ansible_connection: ssh
         ansible_user: vagrant
-        ansible_host: oc-srv-01
+        ansible_host: "{{ user_vm_choice.user_input }}"
 
 
 - name: Read local /etc/hosts file
