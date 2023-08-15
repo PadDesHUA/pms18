@@ -1,40 +1,12 @@
 version: '3'
-
 services:
   owncloud:
-    image: owncloud/server:latest
+    image: owncloud/ubuntu:22.04
     ports:
-      - "8080:8080"
+      - "192.168.56.10:8080:8080"
     volumes:
-      - ./owncloud/data:/var/www/html
+      - ~/owncloud_data:/var/www/html
     environment:
-      - OWNCLOUD_DB_TYPE=mysql
-      - OWNCLOUD_DB_NAME=ocuser
-      - OWNCLOUD_DB_USERNAME=ocuser
-      - OWNCLOUD_DB_PASSWORD=owncloud
-      - OWNCLOUD_ADMIN_USERNAME=dbadmin
-      - OWNCLOUD_ADMIN_PASSWORD=dbpassword
-
-  influxdb:
-    image: influxdb:1.8.10
-    ports:
-      - "8086:8086"
-    volumes:
-      - ./influxdb:/var/lib/influxdb
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./grafana:/var/lib/grafana
-
-  telegraf:
-    image: telegraf:latest
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      - INFLUXDB_URL=http://influxdb:8086
-      - INFLUXDB_DATABASE=telegraf
-      - INFLUXDB_USERNAME=telegraf
-      - INFLUXDB_PASSWORD=telegrafpassword
+      - OWNCLOUD_DOMAIN=localhost,192.168.56.1,192.168.56.10,172.18.0.1,0.0.0.0,control
+      - OWNCLOUD_TRUSTED_DOMAINS=localhost,192.168.56.1,192.168.56.10,172.18.0.1,0.0.0.0,control
+    restart: always
