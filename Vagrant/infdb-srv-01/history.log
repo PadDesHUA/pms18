@@ -1,0 +1,92 @@
+    1  sudo nano ~/.ssh/authorized_keys 
+    2  exit
+    3  ls
+    4  ls -lha
+    5  sudo find / -type f -name influxdata-archive_compat.key
+    6  wget -q https://repos.influxdata.com/influxdata-archive_compat.key
+    7  sudo find / -type f -name influxdata-archive_compat.key
+    8  ls -lha
+    9  ls -la
+   10  ls -l
+   11  ps aux | grep apt
+   12  ip a
+   13  ps aux | grep apt
+   14  sudo find / -type f -name *.key
+   15  sudo find / -type f -name *.tar.gz
+   16  sudo ps -ef | grep influx
+   17  netstat
+   18  sudo apt install net-tools
+   19  netstat -tulpn
+   20  apt install net-tools
+   21  sudo systemctl status influxdb
+   22  systemctl status influxdb
+   23  apt install influxdb 
+   24  sudo apt install influxdb 
+   25  apt install influxdb 
+   26  systemctl status influxdb
+   27  systemctl restart influxdb
+   28  sudo systemctl restart influxdb
+   29  systemctl restart influxdb
+   30  sudo apt update
+   31  sudo apt list --upgradable
+   32  sudo reboot
+   33  influx
+   34  sudo influx
+   35  apt install influxdb-client
+   36  sudo apt install influxdb-client
+   37  sudo influx
+   38  netstat -tulpn
+   39  influx
+   40  sudo shutown now
+   41  sudo shutdown now
+   42  influx
+   43  sudo systemctl restart influx
+   44  sudo systemctl restart influxdb
+   45  influx
+   46  sudo systemctl restart influxdb
+   47  influx
+   48  influx -precision rfc3339 -database telegraf -execute 'SELECT * from exec_dnscollector' -format 'csv' -pretty
+   49  influx -precision rfc3339 -database telegraf -execute 'SELECT * from exec_dnscollector' -format 'csv'
+   50  influx -precision rfc3339 -database telegraf -execute 'SELECT * from exec_dnscollecor'
+   51  influx -precision rfc3339 -database telegraf -execute 'SELECT * from exec_dnscollecor' -format 'csv'
+   52  influx -precision rfc3339 -database telegraf -execute 'SELECT * from exec_dnscollector' -format 'csv'
+   53  influx
+   54  influx -precision rfc3339 -database telegraf -execute 'SELECT * from exec_dnscollector' -format 'csv'
+   55  date
+   56  date --help
+   57  TZ='Europe/Athens' date
+   58  influx -precision rfc3339 -database telegraf -execute 'SELECT * from exec_dnscollector' -format 'csv'
+   59  /vagrant/dns.sh
+   60  ping -g 56 -G 1492 -h 10 -D 8.8.4.4
+   61  ping -s $size -c 4 -M do google.com; done
+   62  ping -s $size -c 4 -M do google.com
+   63  ping -c 3 8.8.8.8
+   64  ping -c 3 -s 1024 8.8.8.8
+   65  ping -c 3 -s 100 8.8.8.8
+   66  ping -c 3 -s 80 8.8.8.8
+   67  ping -c 3 -s 56 8.8.8.8
+   68  ping -f oc-srv-01
+   69  ping -f 8.8.8.8
+   70  ping -f in.gr
+   71* ping -
+   72  ping -c 3 -s 76 oc-srv-01
+   73  ping -c 3 -s 100 oc-srv-01
+   74  ping -c 3 -s 500 oc-srv-01
+   75  ping -c 3 -s 1024 oc-srv-01
+   76  ping -c 20 -s 2048 oc-srv-01
+   77  nano ~/.ssh/authorized_keys 
+   78  influx
+   79  sudo systemctl restart influxdb
+   80  influx
+   81  influx ALTER MEASUREMENT "exec_topcollector" ON "telegraf" MODIFY field * INTEGER
+   82  influx -precision rfc3339 -database telegraf -execute 'ALTER MEASUREMENT "exec_topcollector" ON "telegraf" MODIFY field * INTEGER
+'
+   83  influ
+   84  influx
+   85  nano ~/.ssh/authorized_keys 
+   86  ip a
+   87  nano ~/.ssh/authorized_keys 
+   88  ls
+   89  history > /vagrant/infdb-srv-01/history.log
+   90  mkdir /vagrant/infdb-srv-01
+   91  history > /vagrant/infdb-srv-01/history.log

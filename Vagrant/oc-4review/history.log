@@ -1,0 +1,29 @@
+    1  sudo nano ~/.ssh/authorized_keys 
+    2  exit
+    3  cat /var/www/owncloud/config/config.php 
+    4  sudo cat /var/www/owncloud/config/config.php 
+    5  exit
+    6  sudo find / -type f -name config.php
+    7  sudo shutdown now
+    8  top -b -n 1 | grep $(pidof owncloud) 
+    9  top -b -n 1
+   10  top
+   11  command=$(top -b -n 1 | awk '
+   12      /%Cpu\(s\):/ { cpu = $2 }
+   13      /MiB Mem/ { mem_used = $4; mem_total = $6 }
+   14      /%MEM/ { mem_percent += $1 }
+   15      /Tasks:/ { pids = $2 }
+   16      END {
+   17          printf "%.1f,%.1f/%.1f,%.1f,%d\n", cpu, mem_used, mem_total, mem_percent, pids
+   18      }
+   19  ')
+   20  echo -e "CPU %,MEM USAGE/LIMIT,MEM %,PIDS"
+   21  echo -e "$command"
+   22  exit
+   23  sudo nano ~/.ssh/authorized_keys 
+   24  exit
+   25  ls
+   26  ls -la
+   27  ls -la .config/
+   28  mkdir /vagrant/oc-4review
+   29  history > /vagrant/oc-4review/history.log

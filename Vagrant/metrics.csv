@@ -1,0 +1,3 @@
+ServerName,CPU(%),Mem%(available/free),PIDs
+oc-srv-01,0.0 us, KiB/ KiB,104
+owncloud_server,0.00 us,owncloud_server GiB/3.821GiB,24.8MB
