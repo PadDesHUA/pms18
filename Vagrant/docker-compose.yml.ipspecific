@@ -13,8 +13,15 @@ volumes:
 services:
   owncloud:
     image: owncloud/server:${OWNCLOUD_VERSION}
-    container_name: owncloud_server
+    container_name: oc-cont-01
+    build: 
+      context: ./owncloud
+      args:
+        CONTAINER_NAME: oc-cont-01
     restart: always
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.56.120 
     ports:
       - ${HTTP_PORT}:8080
     depends_on:
@@ -43,8 +50,15 @@ services:
 
   mariadb:
     image: mariadb:10.11 # minimum required ownCloud version is 10.9
-    container_name: owncloud_mariadb
+    container_name: oc_mariadb-cont-01
+    build: 
+      context: ./oc_mariadb
+      args:
+        CONTAINER_NAME: oc_mariadb-cont-01
     restart: always
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.56.121
     environment:
       - MYSQL_ROOT_PASSWORD=owncloud
       - MYSQL_USER=owncloud
@@ -62,8 +76,15 @@ services:
 
   redis:
     image: redis:6
-    container_name: owncloud_redis
+    container_name: oc_redis-cont-01
+    build: 
+      context: ./oc_redis
+      args:
+        CONTAINER_NAME: oc_redis-cont-01
     restart: always
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.56.122
     command: ["--databases", "1"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -73,23 +94,38 @@ services:
     volumes:
       - redis:/data
 
-  telegraf:
-    image: telegraf
-    container_name: telegraf
-    restart: always
-    volumes:
-    - ./telegraf-docker.conf:/etc/telegraf/telegraf.conf:ro
-    depends_on:
-      - influxdb
-    links:
-      - influxdb
-    ports:
-    - '8125:8125'
+  # telegraf:
+  #   image: telegraf
+  #   container_name: tlg-cont-01
+    # build: 
+    #   context: ./tlg
+    #   args:
+    #     CONTAINER_NAME: tlg-cont-01
+  #   restart: always
+      # networks:
+      # mynetwork:
+      #   ipv4_address: 192.168.56.150
+  #   volumes:
+  #   - ./telegraf-docker.conf:/etc/telegraf/telegraf.conf:ro
+  #   - /vagrant:/vagrant_control:ro
+  #   depends_on:
+  #     - influxdb
+  #   links:
+  #     - influxdb
+  #   ports:
+  #   - '8125:8125'
 
   influxdb:
     image: influxdb:1.8-alpine
-    container_name: influxdb
+    container_name: infdb-cont-01
+    build: 
+      context: ./influxdb
+      args:
+        CONTAINER_NAME: infdb-cont-01
     restart: always
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.56.130
     environment:
       - INFLUXDB_DB=influx
       - INFLUXDB_ADMIN_USER=admin
@@ -101,8 +137,15 @@ services:
 
   grafana:
     image: grafana/grafana
-    container_name: grafana-server
+    container_name: grf-cont-01
+    build: 
+      context: ./grf
+      args:
+        CONTAINER_NAME: grf-cont-01
     restart: always
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.56.140
     depends_on:
       - influxdb
     environment:
@@ -115,6 +158,11 @@ services:
       - '3000:3000'
     volumes:
       - grafana_data:/var/lib/grafana
-      
-  
 
+networks:
+  mynetwork:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.56.0/24

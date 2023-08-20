@@ -1,4 +1,3 @@
----
 - name: Dynamic Host Selection from Vagrant Status
   hosts: localhost
   gather_facts: no
@@ -12,7 +11,7 @@
         vagrant status | awk '{print $1}' | awk 'NR>2' | head -n -3
       register: vagrant_output
 
-    - name: Extract VM names
+    - name: Extrac  t VM names
       set_fact:
         vm_names: "{{ vagrant_output.stdout_lines + ['all'] }}"
 
@@ -30,25 +29,6 @@
        cd /home/itp22109/pms18/Vagrant/
        vagrant up {{ user_vm_choice.user_input }}
       when: user_vm_choice.user_input != 'all'
-
-#below lines are used when I use my laptop as control
-    - name: Delete previous key if exists
-      shell: |
-        ssh-keygen -f "/home/itp22109/.ssh/known_hosts" -R "{{ user_vm_choice.user_input }}"    
-    - name: Pass SSH Key of my laptop with vagrant
-      chdir: /Vagrant
-      shell: |
-        vagrant ssh-config --host {{ user_vm_choice.user_input }} >> ~/.ssh/config
-      register: sshkey_result
-
-    - name: Tet SSH connection from my laptop and accept key
-      command: ssh -o StrictHostKeyChecking=no vagrant@{{ user_vm_choice.user_input }}
-      register: ssh_result
-      ignore_errors: yes
-
-     - name: Display SSH test result
-       debug:
-        var: ssh_result.stdout_lines
 
     - name: User Input for Playbook choice
       pause:
@@ -81,4 +61,12 @@
       shell: cat /vagrant/pms18_hosts >> /etc/hosts
 
 
-
+- name: Run Docker Compose
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Run Vagrant up for control VM
+      command: vagrant up control
+      args:
+        chdir: /Vagrant
+      when: deployment_choice.user_input == 'docker'

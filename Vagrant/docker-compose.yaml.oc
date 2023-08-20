@@ -1,0 +1,12 @@
+version: '3'
+services:
+  owncloud:
+    image: owncloud/ubuntu:22.04
+    ports:
+      - "192.168.56.10:8080:8080"
+    volumes:
+      - ~/owncloud_data:/var/www/html
+    environment:
+      - OWNCLOUD_DOMAIN=localhost,192.168.56.1,192.168.56.10,172.18.0.1,0.0.0.0,control
+      - OWNCLOUD_TRUSTED_DOMAINS=localhost,192.168.56.1,192.168.56.10,172.18.0.1,0.0.0.0,control
+    restart: always

@@ -13,15 +13,8 @@ volumes:
 services:
   owncloud:
     image: owncloud/server:${OWNCLOUD_VERSION}
-    container_name: oc-cont-01
-    build: 
-      context: ./owncloud
-      args:
-        CONTAINER_NAME: oc-cont-01
+    container_name: owncloud_server
     restart: always
-    networks:
-      mynetwork:
-        ipv4_address: 192.168.56.120 
     ports:
       - ${HTTP_PORT}:8080
     depends_on:
@@ -32,8 +25,8 @@ services:
       - OWNCLOUD_TRUSTED_DOMAINS=${OWNCLOUD_TRUSTED_DOMAINS}
       - OWNCLOUD_DB_TYPE=mysql
       - OWNCLOUD_DB_NAME=owncloud
-      - OWNCLOUD_DB_USERNAME=owncloud
-      - OWNCLOUD_DB_PASSWORD=owncloud
+      - OWNCLOUD_DB_USERNAME=${ADMIN_USERNAME}
+      - OWNCLOUD_DB_PASSWORD=${ADMIN_PASSWORD}
       - OWNCLOUD_DB_HOST=mariadb
       - OWNCLOUD_ADMIN_USERNAME=${ADMIN_USERNAME}
       - OWNCLOUD_ADMIN_PASSWORD=${ADMIN_PASSWORD}
@@ -50,12 +43,12 @@ services:
 
   mariadb:
     image: mariadb:10.11 # minimum required ownCloud version is 10.9
-    container_name: oc_mariadb-cont-01
+    container_name: owncloud_mariadb
     restart: always
     environment:
-      - MYSQL_ROOT_PASSWORD=owncloud
-      - MYSQL_USER=owncloud
-      - MYSQL_PASSWORD=owncloud
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PW}
+      - MYSQL_USER=${ADMIN_USERNAME}
+      - MYSQL_PASSWORD=${ADMIN_PASSWORD}
       - MYSQL_DATABASE=owncloud
       - MARIADB_AUTO_UPGRADE=1
     command: ["--max-allowed-packet=128M", "--innodb-log-file-size=64M"]
@@ -69,7 +62,7 @@ services:
 
   redis:
     image: redis:6
-    container_name: oc_redis-cont-01
+    container_name: owncloud_redis
     restart: always
     command: ["--databases", "1"]
     healthcheck:
@@ -82,11 +75,10 @@ services:
 
   # telegraf:
   #   image: telegraf
-  #   container_name: tlg-cont-01
+  #   container_name: telegraf
   #   restart: always
   #   volumes:
   #   - ./telegraf-docker.conf:/etc/telegraf/telegraf.conf:ro
-  #   - /vagrant:/vagrant_control:ro
   #   depends_on:
   #     - influxdb
   #   links:
@@ -96,12 +88,12 @@ services:
 
   influxdb:
     image: influxdb:1.8-alpine
-    container_name: infdb-cont-01
+    container_name: influxdb
     restart: always
     environment:
       - INFLUXDB_DB=influx
-      - INFLUXDB_ADMIN_USER=admin
-      - INFLUXDB_ADMIN_PASSWORD=admin
+      - INFLUXDB_ADMIN_USER=${INFDB_USER}
+      - INFLUXDB_ADMIN_PASSWORD=${INFDB_PASSWORD}
     ports:
       - '8086:8086'
     volumes:
@@ -109,13 +101,13 @@ services:
 
   grafana:
     image: grafana/grafana
-    container_name: grf-cont-01
+    container_name: grafana-server
     restart: always
     depends_on:
       - influxdb
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRF_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRF_PASSWORD}
       - GF_INSTALL_PLUGINS=
     links:
       - influxdb
@@ -123,11 +115,6 @@ services:
       - '3000:3000'
     volumes:
       - grafana_data:/var/lib/grafana
+      
+  
 
-networks:
-  mynetwork:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 192.168.56.0/24

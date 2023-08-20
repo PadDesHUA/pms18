@@ -18,11 +18,101 @@
         state: present
       with_items:
         - vagrant
-        - virtualbox
-        - virtualbox-ext-pack
-        - virtualbox-qt
+        - docker
+        - docker-compose
+        #- virtualbox
+        #- virtualbox-ext-pack
+        #- virtualbox-qt
         - ansible
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
       ignore_errors: yes
       tags:
         - install_packages
 
+# - name: Execute docker-compose on control host
+#   hosts: control
+#   become: true
+#   tasks:
+    - name: Copy docker-compose.yaml to control VM
+      become: yes
+      shell: |
+        cp /vagrant/docker-compose.yaml /home/vagrant/docker-compose.yaml
+    
+    - name: Copy .env to control VM
+      # become: yes
+      shell: |
+        cp /vagrant/.env ~/.env
+    
+    - name: Get OS version
+      shell: |
+        lsb_release -si
+      register: os_family
+    
+    - name: Debug os_family value
+      debug:
+        var: os_family
+
+    - name: Ensure docker-compose is installed
+      become: true
+      apt:
+        name: docker-compose
+        state: present
+      when: os_family.stdout == "Ubuntu"
+    
+    - name: Check if vagrant user is in docker group
+      command: id -nG vagrant
+      register: vagrant_groups
+      changed_when: false
+      failed_when: false
+
+    - name: Add vagrant user to docker group
+      become: true
+      shell: |
+        usermod -aG docker $USER 
+
+      when: os_family.stdout == "Ubuntu"
+    
+    
+    - name: Reboot the device
+      become: yes
+      reboot:
+        msg: "Reboot initiated by Ansible"
+        connect_timeout: 5
+        reboot_timeout: 600
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami  # Optional: Set a reboot timeout in seconds (default is 600 seconds)
+      when: "'docker' not in vagrant_groups.stdout"
+    
+    - name: Continue with other tasks
+      debug:
+        msg: "Vagrant is in the docker group. Proceeding with other tasks."
+      when: "'docker' in vagrant_groups.stdout"
+
+    - name: User Input for docker-compose execution
+      pause:
+        prompt: "Do you want to run docker-compose \n for docker version of the exercise? (yes/no)"
+      register: docker_compose_choice
+
+
+    - name: Execute docker-compose up
+      become: yes
+      command: docker-compose up -d
+      when: docker_compose_choice.user_input == 'yes'
+      register: docker_compose_result
+      async: 300
+
+    - name: Monitor progress
+      async_status:
+        jid: "{{ docker_compose_result.ansible_job_id }}"
+      register: job_result
+      until: job_result.finished
+      retries: 6000  # Adjust as needed, this example waits up to 300 seconds (5 minutes) for the task to complete
+      delay: 30    # Delay between checking the status (in seconds)
+
+    - name: Show the final result
+      debug:
+        var: docker_compose_result.stdout_lines
