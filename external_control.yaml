@@ -189,23 +189,23 @@
         var: docker_compose_result.stdout_lines
     
     - name: Execute VagrantFile for PMS Servers
-      becmome: true
-      shell: |  
+      shell: |
         mkdir /home/itp22109/pms18/
         mkdir /home/itp22109/pms18/Vagrant/
         cd /home/itp22109/pms18/Vagrant/
         wget https://github.com/PadDesHUA/pms18/blob/main/Vagrant_External/Vagrantfile
+      become: yes
       vars:
         ansible_become_pass: password 
     
-    - name: Execute vagrant up for creating PMS VM's
+    - name: Execute vagrant up for PMS VMs
       shell: |
        cd /home/itp22109/pms18/Vagrant/
        vagrant up
-      register: vagrant_up_output
+      register: vagrant_up_stdoutput
     
     - name: Show Results from vagrant up
       debug:
-        var: vagrant_up_output.stdout.lines
+        var: vagrant_up_stdoutput.stdout.lines
     
     
