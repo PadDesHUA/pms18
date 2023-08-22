@@ -106,14 +106,14 @@
     - name: Copy docker-compose.yaml to control VM
       become: yes
       shell: |
-        cp /vagrant/docker-compose.yaml /home/vagrant/docker-compose.yaml
+        wget https://github.com/PadDesHUA/pms18/blob/main/Vagrant/docker-compose.yaml
       vars:
         ansible_become_pass: password  
 
     - name: Copy .env to control VM
       # become: yes
       shell: |
-        cp /vagrant/.env ~/.env
+        wget https://github.com/PadDesHUA/pms18/blob/main/Vagrant/.env
       vars:
         ansible_become_pass: password  
 
