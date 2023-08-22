@@ -6,6 +6,27 @@
   #   vagrant_folder: "./Vagrant"
   #   vagrant_status_command: "cd {{ vagrant_folder }} && vagrant status | awk '{print $1}' | awk 'NR>2' | head -n -3"
   tasks:
+    
+    - name: Read control host IP from .ssh/config
+      shell: |
+        grep -A 2 "Host control" ~/.ssh/config | grep "^\s*hostname" | awk '{print $2}'
+      register: control_host_ip
+      changed_when: false
+
+    - name: Include external tasks if control host IP is different
+      include_tasks: external_control.yaml
+      when: control_host_ip.stdout != "192.168.56.10"
+      vars: 
+        ansible_connection: ssh
+        ansible_user: itp22109
+        ansible_host: control
+
+    - name: Generate SSH Key Pair
+      openssh_keypair:
+        path: /home/itp22109/.ssh/control_key
+        owner: itp22109
+        group: itp22109
+    
     - name: Get Vagrant VMs
       shell: |
         cd /home/itp22109/pms18/Vagrant/
@@ -33,11 +54,16 @@
 
 #below lines are used when I use my laptop as control
     - name: Delete previous key if exists
+      become: yes
       shell: |
         ssh-keygen -f "/home/itp22109/.ssh/known_hosts" -R "{{ user_vm_choice.user_input }}"    
+        chown itp22109:itp22109 ~/.ssh/known_hosts
+      vars:
+        ansible_become_pass: password
+
     - name: Pass SSH Key of my laptop with vagrant
-      chdir: /Vagrant
       shell: |
+        cd /home/itp22109/pms18/Vagrant/
         vagrant ssh-config --host {{ user_vm_choice.user_input }} >> ~/.ssh/config
       register: sshkey_result
 
@@ -46,14 +72,22 @@
       register: ssh_result
       ignore_errors: yes
 
-     - name: Display SSH test result
-       debug:
-        var: ssh_result.stdout_lines
+    - name: Display SSH test result
+      debug:
+       var: ssh_result.stdout_lines
 
     - name: User Input for Playbook choice
       pause:
         prompt: "Do you want to run the Ansible playbook on the selected VM? (yes/no)"
       register: user_playbook_choice
+
+    - name: Copy Public Key to VMs
+      become: yes
+      shell: |
+        ssh-copy-id -i /home/itp22109/.ssh/control_key.pub vagrant@{{ item }}
+        chown vagrant:vagrant /home/vagrant/.ssh/control_key.pub
+      loop: "{{ vagrant_output.stdout_lines }}"
+      ignore_errors: yes
 
     - name: Execute Ansible playbook based on user choice
       include_tasks: "{{ user_vm_choice.user_input }}.yaml"

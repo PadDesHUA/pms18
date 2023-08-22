@@ -1,0 +1,193 @@
+---
+# - name: Install necessary packages at control station
+#   hosts: external_control
+#   remote_user: vagrant
+#   become: true
+#   tasks:
+    - name: Update apt update_cache
+      become: yes
+      apt:
+        update_cache: yes
+      vars:
+        ansible_become_pass: password
+      tags:
+        - update_apt_cache
+      
+    - name: Prequisites for Installation of VirtualBox-7
+      become: yes
+      shell: |
+        curl https://www.virtualbox.org/download/oracle_vbox_2016.asc | gpg --dearmor > oracle_vbox_2016.gpg
+        curl https://www.virtualbox.org/download/oracle_vbox.asc | gpg --dearmor > oracle_vbox.gpg
+        install -o root -g root -m 644 oracle_vbox_2016.gpg /etc/apt/trusted.gpg.d/
+        install -o root -g root -m 644 oracle_vbox.gpg /etc/apt/trusted.gpg.d/ 
+        echo "deb [arch=amd64] http://download.virtualbox.org/virtualbox/debian $(lsb_release -sc) contrib" | sudo tee /etc/apt/sources.list.d/virtualbox.list
+      vars:
+        ansible_become_pass: password
+
+    - name: Update apt update_cache
+      become: yes
+      apt:
+        update_cache: yes
+      vars:
+        ansible_become_pass: password
+
+    - name: Install VirtualBox-7 and add user to Group
+      become: yes
+      shell: |
+       sudo apt install -y linux-headers-$(uname -r) dkms
+       sudo apt install virtualbox-7.0 -y
+       usermod -aG vboxusers itp22109
+      vars:
+        ansible_become_pass: password  
+      ignore_errors: yes
+
+    - name: Check If user is in vboxusers
+      shell: |
+        groups $USER | grep -o '\bvboxusers\b'
+      register: user_group
+
+    - name: VirtualBox Version extract
+      shell: |
+        VBoxManage --version | grep -oP '\d+\.\d+\.\d+'
+      register: vbox_ver
+
+    - name: Reboot for aplying User group Add
+      become: yes
+      reboot:
+        msg: "Reboot initiated by Ansible"
+        connect_timeout: 5
+        reboot_timeout: 600
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami
+      vars:
+        ansible_become_pass: password
+      when: "'vboxusers' not in user_group.stdout"
+
+    - name: VBoxManage Installation
+      shell: |
+        wget https://download.virtualbox.org/virtualbox/{{ vbox_ver.stdout_lines }}/Oracle_VM_VirtualBox_Extension_Pack-{{ vbox_ver.stdout_lines }}.vbox-extpack
+        vboxmanage extpack install Oracle_VM_VirtualBox_Extension_Pack-{{ vbox_ver.stdout_lines }}.vbox-extpack -y
+        vboxmanage list extpacks
+      register: vbox_list
+    
+    - name: Present VBox list
+      debug:
+        var: vbox_list.stdout_lines
+
+
+    - name: Install packages
+      become: yes
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - vagrant
+        - docker.io
+        - docker-compose
+        - ansible
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+      ignore_errors: yes
+      vars:
+        ansible_become_pass: password
+      tags:
+        - install_packages
+      
+    - name: Install vagrant-hostmanager plugin
+      ansible.builtin.command: vagrant plugin install vagrant-hostmanager
+
+# - name: Execute docker-compose on control host
+#   hosts: control
+#   become: true
+#   tasks:
+    - name: Copy docker-compose.yaml to control VM
+      become: yes
+      shell: |
+        cp /vagrant/docker-compose.yaml /home/vagrant/docker-compose.yaml
+      vars:
+        ansible_become_pass: password  
+
+    - name: Copy .env to control VM
+      # become: yes
+      shell: |
+        cp /vagrant/.env ~/.env
+      vars:
+        ansible_become_pass: password  
+
+    - name: Get OS version
+      shell: |
+        lsb_release -si
+      register: os_family
+    
+    - name: Debug os_family value
+      debug:
+        var: os_family
+
+    - name: Ensure docker-compose is installed
+      become: true
+      apt:
+        name: docker-compose
+        state: present
+      when: os_family.stdout == "Ubuntu"
+    
+    - name: Check if vagrant user is in docker group
+      command: id -nG vagrant
+      register: vagrant_groups
+      changed_when: false
+      failed_when: false
+
+    - name: Add vagrant user to docker group
+      become: true
+      shell: |
+        usermod -aG docker $USER 
+      when: os_family.stdout == "Ubuntu"
+      vars:
+        ansible_become_pass: password  
+    
+    - name: Reboot the device
+      become: yes
+      reboot:
+        msg: "Reboot initiated by Ansible"
+        connect_timeout: 5
+        reboot_timeout: 600
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami  # Optional: Set a reboot timeout in seconds (default is 600 seconds)
+      when: "'docker' not in vagrant_groups.stdout"
+    
+    - name: Continue with other tasks
+      debug:
+        msg: "Vagrant is in the docker group. Proceeding with other tasks."
+      when: "'docker' in vagrant_groups.stdout"
+
+    - name: User Input for docker-compose execution
+      pause:
+        prompt: "Do you want to run docker-compose \n for docker version of the exercise? (yes/no)"
+      register: docker_compose_choice
+
+
+    - name: Execute docker-compose up
+      become: yes
+      command: docker-compose up -d
+      when: docker_compose_choice.user_input == 'yes'
+      register: docker_compose_result
+      async: 300
+
+    - name: Monitor progress
+      async_status:
+        jid: "{{ docker_compose_result.ansible_job_id }}"
+      register: job_result
+      until: job_result.finished
+      retries: 6000  # Adjust as needed, this example waits up to 300 seconds (5 minutes) for the task to complete
+      delay: 30    # Delay between checking the status (in seconds)
+
+    - name: Show the final result
+      debug:
+        var: docker_compose_result.stdout_lines
+    
+    - name: Execute VagrantFile for PMS Servers
+      shell: |  
+        mkdir /home/

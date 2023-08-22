@@ -1,1 +1,14 @@
 nikolas
+vagrant_up.yaml
+test
+pms18-choice.yaml
+playbook-pms18-Influx.yaml
+ocphpuser.yaml
+mariadb.yaml
+docker-srv.yaml
+docker-pms18.yaml
+Vagrant/control-files4review
+Vagrant/infdb-srv-01
+Vagrant/oc-4review
+Vagrant/telegraf-files4review
+

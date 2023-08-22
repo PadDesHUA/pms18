@@ -11,7 +11,7 @@
         vagrant status | awk '{print $1}' | awk 'NR>2' | head -n -3
       register: vagrant_output
 
-    - name: Extrac  t VM names
+    - name: Extract VM names
       set_fact:
         vm_names: "{{ vagrant_output.stdout_lines + ['all'] }}"
 
