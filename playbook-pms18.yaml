@@ -51,6 +51,12 @@
        cd /home/itp22109/pms18/Vagrant/
        vagrant up {{ user_vm_choice.user_input }}
       when: user_vm_choice.user_input != 'all'
+    
+    - name: Execute vagrant up for selected VM
+      shell: |
+       cd /home/itp22109/pms18/Vagrant/
+       vagrant up
+      when: user_vm_choice.user_input == 'all'
 
 #below lines are used when I use my laptop as control
     - name: Delete previous key if exists
