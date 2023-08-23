@@ -182,6 +182,28 @@
       vars:
         ansible_become_pass: password
 
+    - name: Copy dns collector file
+      become: yes
+      shell: |
+        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/dns.sh
+      vars:
+        ansible_become_pass: password
+
+    - name: Copy influxDB Server Collector file
+      become: yes
+      shell: |
+        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/top-infdb-srv-01.sh
+      vars:
+        ansible_become_pass: password
+
+    - name: Copy influxDB Docker Collector file
+      become: yes
+      shell: |
+        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/top-influxdb.sh
+      vars:
+        ansible_become_pass: password
+
+
     - name: Execute docker-compose up
       become: yes
       command: docker-compose up -d
