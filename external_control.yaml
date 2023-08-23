@@ -223,10 +223,12 @@
       delay: 30    # Delay between checking the status (in seconds)
       vars:
         ansible_become_pass: password
+      ignore_errors: yes
 
     - name: Show the final result
       debug:
         var: docker_compose_result.stdout_lines
+      ignore_errors: yes
     
     - name: Execute VagrantFile for PMS Servers
       shell: |
@@ -238,6 +240,14 @@
       vars:
         ansible_become_pass: password 
     
+    - name: Generate SSH key pair
+      command: ssh-keygen -t rsa -b 2048 -f ~/.ssh/control_external -N ""
+      register: ssh_keygen_result
+
+    - name: Display SSH key generation result
+      debug:
+        var: ssh_keygen_result.stdout_lines
+
     - name: Execute vagrant up for PMS VMs
       shell: |
        cd /home/itp22109/pms18/Vagrant/
