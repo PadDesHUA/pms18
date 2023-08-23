@@ -99,6 +99,7 @@
     - name: Install vagrant-hostmanager plugin
       ansible.builtin.command: vagrant plugin install vagrant-hostmanager
 
+
 # - name: Execute docker-compose on control host
 #   hosts: control
 #   become: true
@@ -106,14 +107,14 @@
     - name: Copy docker-compose.yaml to control VM
       become: yes
       shell: |
-        wget https://github.com/PadDesHUA/pms18/blob/main/Vagrant/docker-compose.yaml
+        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/docker-compose.yaml
       vars:
         ansible_become_pass: password  
 
     - name: Copy .env to control VM
       # become: yes
       shell: |
-        wget https://github.com/PadDesHUA/pms18/blob/main/Vagrant/.env
+        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/.env
       vars:
         ansible_become_pass: password  
 
@@ -132,18 +133,21 @@
         name: docker-compose
         state: present
       when: os_family.stdout == "Ubuntu"
+      vars:
+        ansible_become_pass: password
     
-    - name: Check if vagrant user is in docker group
-      command: id -nG vagrant
+    - name: Check if user is in docker group
+      command: id -nG $USER
       register: vagrant_groups
       changed_when: false
       failed_when: false
 
-    - name: Add vagrant user to docker group
-      become: true
-      shell: |
-        usermod -aG docker $USER 
-      when: os_family.stdout == "Ubuntu"
+    - name: Add user to docker group
+      become: yes
+      user:
+        name: itp22109
+        groups: docker
+        append: yes
       vars:
         ansible_become_pass: password  
     
@@ -157,8 +161,10 @@
         post_reboot_delay: 30
         test_command: whoami  # Optional: Set a reboot timeout in seconds (default is 600 seconds)
       when: "'docker' not in vagrant_groups.stdout"
+      vars:
+        ansible_become_pass: password
     
-    - name: Continue with other tasks
+    - name: Inform that User is in docker group
       debug:
         msg: "Vagrant is in the docker group. Proceeding with other tasks."
       when: "'docker' in vagrant_groups.stdout"
@@ -169,20 +175,32 @@
       register: docker_compose_choice
 
 
+    - name: Copy telegraf.conf file
+      become: yes
+      shell: |
+        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/telegraf-docker_external.conf
+      vars:
+        ansible_become_pass: password
+
     - name: Execute docker-compose up
       become: yes
       command: docker-compose up -d
       when: docker_compose_choice.user_input == 'yes'
       register: docker_compose_result
       async: 300
+      vars:
+        ansible_become_pass: password
 
     - name: Monitor progress
+      become: yes
       async_status:
         jid: "{{ docker_compose_result.ansible_job_id }}"
       register: job_result
       until: job_result.finished
       retries: 6000  # Adjust as needed, this example waits up to 300 seconds (5 minutes) for the task to complete
       delay: 30    # Delay between checking the status (in seconds)
+      vars:
+        ansible_become_pass: password
 
     - name: Show the final result
       debug:
