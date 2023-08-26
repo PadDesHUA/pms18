@@ -4,15 +4,53 @@
 #   remote_user: vagrant
 #   become: true
 #   tasks:
+    
+- name: Remnote Control Configuration
+  remote_user: itp22109
+  become: yes
+  vars: 
+    ansible_become_pass: password
+  block:
     - name: Update apt update_cache
-      become: yes
       apt:
         update_cache: yes
-      vars:
-        ansible_become_pass: password
       tags:
         - update_apt_cache
-      
+    
+    - name: Remove existing HashiCorp GPG keyring file
+      file:
+        path: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+        state: absent
+
+    - name: Install Vagrant Key
+      shell: |
+        wget -q -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+    - name: Install Vagrant Apt Source
+      shell: |
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+    - name: Update apt update_cache
+      apt:
+        update_cache: yes
+      register: update_after_vagrant_apt_key
+
+
+    - name: Vagrant Output Installation
+      debug:
+        var: update_after_vagrant_apt_key.stdout_lines
+
+    - name: Install Vagrant
+      apt:
+        name: vagrant
+        state: present
+      register: vagrant_install_latest
+
+    - name: Vagrant Output Installation
+      debug:
+        var: vagrant_install_latest.stdout_lines
+
+
     - name: Prequisites for Installation of VirtualBox-7
       become: yes
       shell: |
@@ -25,34 +63,27 @@
         ansible_become_pass: password
 
     - name: Update apt update_cache
-      become: yes
       apt:
         update_cache: yes
-      vars:
-        ansible_become_pass: password
 
     - name: Install VirtualBox-7 and add user to Group
-      become: yes
       shell: |
-       sudo apt install -y linux-headers-$(uname -r) dkms
-       sudo apt install virtualbox-7.0 -y
+       apt install -y linux-headers-$(uname -r) dkms
+       apt install virtualbox-7.0 -y
        usermod -aG vboxusers itp22109
-      vars:
-        ansible_become_pass: password  
       ignore_errors: yes
-
+  
     - name: Check If user is in vboxusers
-      shell: |
-        groups $USER | grep -o '\bvboxusers\b'
-      register: user_group
-
-    - name: VirtualBox Version extract
-      shell: |
-        VBoxManage --version | grep -oP '\d+\.\d+\.\d+'
-      register: vbox_ver
-
-    - name: Reboot for aplying User group Add
-      become: yes
+      command: groups {{ ansible_user }}  
+      register: user_groups
+      changed_when: false
+      ignore_errors: true
+      
+    - name: Display user group membership
+      debug:
+        msg: "User is{{ ' not' if user_groups.rc != 0 or 'vboxusers' not in user_groups.stdout else '' }} in vboxusers group"
+      
+    - name: Reboot for applying User group Add
       reboot:
         msg: "Reboot initiated by Ansible"
         connect_timeout: 5
@@ -60,9 +91,12 @@
         pre_reboot_delay: 0
         post_reboot_delay: 30
         test_command: whoami
-      vars:
-        ansible_become_pass: password
-      when: "'vboxusers' not in user_group.stdout"
+      when: user_groups.rc != 0
+
+    - name: VirtualBox Version extract
+      shell: |
+        VBoxManage --version | grep -oP '\d+\.\d+\.\d+'
+      register: vbox_ver
 
     - name: VBoxManage Installation
       shell: |
@@ -77,12 +111,11 @@
 
 
     - name: Install packages
-      become: yes
       apt:
         name: "{{ item }}"
         state: present
       with_items:
-        - vagrant
+        - libvirt-daemon-system
         - docker.io
         - docker-compose
         - ansible
@@ -91,32 +124,11 @@
         - curl
         - software-properties-common
       ignore_errors: yes
-      vars:
-        ansible_become_pass: password
       tags:
         - install_packages
       
     - name: Install vagrant-hostmanager plugin
       ansible.builtin.command: vagrant plugin install vagrant-hostmanager
-
-
-# - name: Execute docker-compose on control host
-#   hosts: control
-#   become: true
-#   tasks:
-    - name: Copy docker-compose.yaml to control VM
-      become: yes
-      shell: |
-        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant_External/docker-compose.yaml
-      vars:
-        ansible_become_pass: password  
-
-    - name: Copy .env to control VM
-      # become: yes
-      shell: |
-        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant_External/.env
-      vars:
-        ansible_become_pass: password  
 
     - name: Get OS version
       shell: |
@@ -169,93 +181,196 @@
         msg: "Vagrant is in the docker group. Proceeding with other tasks."
       when: "'docker' in vagrant_groups.stdout"
 
+- name: Ask user to choose Docker Compose or Vagrant Up
+  pause:
+    prompt: "Do you want to run Docker Compose (1) or Vagrant Up (2)?"
+  register: user_choice
+
+- name: Docker Compose UP and Results Tasks
+  block:
+    - name: Copy docker-compose.yaml to control VM
+      ansible.builtin.stat:
+        path: ./docker-compose.yaml
+      register: docker_compose_stat
+
+    - name: Download docker-compose.yaml if not exists
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant_External/docker-compose.yaml
+        dest: ./
+        mode: '0755'
+      when: not docker_compose_stat.stat.exists
+
+    - name: Copy .env to control VM
+      ansible.builtin.stat:
+        path: ./.env
+      register: env_file_stat
+
+    - name: Download .env if not exists
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant_External/.env
+        dest: ./
+        mode: '0755'
+      when: not env_file_stat.stat.exists
+
     - name: User Input for docker-compose execution
       pause:
         prompt: "Do you want to run docker-compose \n for docker version of the exercise? (yes/no)"
-      register: docker_compose_choice
-
-
-    - name: Copy telegraf.conf file
-      become: yes
-      shell: |
-        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/telegraf-docker_external.conf
-      vars:
-        ansible_become_pass: password
-
-    - name: Copy dns collector file
-      become: yes
-      shell: |
-        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/dns.sh
-      vars:
-        ansible_become_pass: password
-
-    - name: Copy influxDB Server Collector file
-      become: yes
-      shell: |
-        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/top-infdb-srv-01.sh
-      vars:
-        ansible_become_pass: password
-
-    - name: Copy influxDB Docker Collector file
-      become: yes
-      shell: |
-        wget https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/top-influxdb.sh
-      vars:
-        ansible_become_pass: password
-
+      register: docker_compose_input
 
     - name: Execute docker-compose up
-      become: yes
       command: docker-compose up -d
-      when: docker_compose_choice.user_input == 'yes'
-      register: docker_compose_result
+      when: docker_compose_input.user_input | lower == 'yes'
       async: 300
       vars:
         ansible_become_pass: password
+      register: docker_compose_result
+      changed_when: false
+      ignore_errors: true
 
     - name: Monitor progress
-      become: yes
       async_status:
         jid: "{{ docker_compose_result.ansible_job_id }}"
       register: job_result
       until: job_result.finished
-      retries: 6000  # Adjust as needed, this example waits up to 300 seconds (5 minutes) for the task to complete
-      delay: 30    # Delay between checking the status (in seconds)
-      vars:
-        ansible_become_pass: password
-      ignore_errors: yes
+      retries: 6000
+      delay: 30
+      when: docker_compose_input.user_input | lower == 'yes' and docker_compose_result is succeeded
+      ignore_errors: true
+  when: user_choice.user_input == "1"
 
-    - name: Show the final result
-      debug:
-        var: docker_compose_result.stdout_lines
-      ignore_errors: yes
+- name: Vagrant Up Block Tasks
+  block:
+    - name: Copy telegraf.conf file
+      ansible.builtin.stat:
+        path: ./telegraf.conf
+      register: telegraf_conf_stat
     
-    - name: Execute VagrantFile for PMS Servers
-      shell: |
-        mkdir /home/itp22109/pms18/
-        mkdir /home/itp22109/pms18/Vagrant/
-        cd /home/itp22109/pms18/Vagrant/
-        wget https://github.com/PadDesHUA/pms18/blob/main/Vagrant_External/Vagrantfile
-      become: yes
-      vars:
-        ansible_become_pass: password 
-    
-    - name: Generate SSH key pair
-      command: ssh-keygen -t rsa -b 2048 -f ~/.ssh/control_external -N ""
-      register: ssh_keygen_result
+    - name: Download telegraf.conf if not exists
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant_External/telegraf.conf
+        dest: ./telegraf.conf
+        mode: '0755'
+      when: not telegraf_conf_stat.stat.exists
 
-    - name: Display SSH key generation result
-      debug:
-        var: ssh_keygen_result.stdout_lines
+    - name: Copy dns collector file
+      ansible.builtin.stat:
+        path: ./dns.sh
+      register: dns_script_stat
+
+    - name: Download dns.sh if not exists
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/dns.sh
+        dest: ./dns.sh
+        mode: '0755'
+      when: not dns_script_stat.stat.exists
+      
+    - name: Copy influxDB Server Collector file
+      ansible.builtin.stat:
+        path: ./top-infdb-srv-01.sh
+      register: infdb_srv_script_stat
+
+    - name: Download top-infdb-srv-01.sh if not exists
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/top-infdb-srv-01.sh
+        dest: ./top-infdb-srv-01.sh
+        mode: '0755'
+      when: not infdb_srv_script_stat.stat.exists
+
+    - name: Copy influxDB Docker Collector file
+      ansible.builtin.stat:
+        path: ./top-influxdb.sh
+      register: influxdb_script_stat
+
+    - name: Download top-influxdb.sh if not exists
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant/top-influxdb.sh
+        dest: ./top-influxdb.sh
+        mode: '0755'
+      when: not influxdb_script_stat.stat.exists
+
+    - name: Check if symbolic link exists
+      ansible.builtin.stat:
+        path: control_external.pub
+      register: symlink_stat
+
+    - name: Create symbolic link and copy pub key from Control External
+      ansible.builtin.shell: >
+        ln -n ~/.ssh/control_external.pub control_external.pub
+      when: not symlink_stat.stat.exists
 
     - name: Execute vagrant up for PMS VMs
-      shell: |
-       cd /home/itp22109/pms18/Vagrant/
-       vagrant up
-      register: vagrant_up_stdoutput
-    
-    - name: Show Results from vagrant up
-      debug:
-        var: vagrant_up_stdoutput.stdout.lines
-    
-    
+      ansible.builtin.shell: vagrant up
+      args:
+        chdir: /home/itp22109/pms18/Vagrant/
+      async: 3600
+      poll: 0
+      register: vagrant_up_result
+      changed_when: false
+
+    - name: Wait for vagrant up to complete
+      async_status:
+        jid: "{{ vagrant_up_result.ansible_job_id }}"
+      register: job_result
+      until: job_result.finished
+      retries: 600
+      delay: 10
+      when: vagrant_up_result.finished  # Wait regardless of the return code
+
+    - name: Get the status of VMs after vagrant up
+      ansible.builtin.shell: vagrant status
+      args:
+        chdir: /home/itp22109/pms18/Vagrant/
+      register: vagrant_status_result
+      changed_when: false
+
+    - name: Copy pms18_hosts file from GIT Repo
+      ansible.builtin.stat:
+        path: ./Vagrant
+      register: pms18_hosts_stat
+
+    - name: Download pms18_hosts file if not exists
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant_External/pms18_hosts
+        dest: "/home/itp22109/pms18/Vagrant/pms18_hosts"
+        mode: '0755'
+      when: not pms18_hosts_stat.stat.exists
+
+      
+    - name: Append pms18_hosts content to /etc/hosts
+      ansible.builtin.copy:
+        content: "{{ lookup('file', '/home/itp22109/pms18/Vagrant/pms18_hosts') }}"
+        dest: /etc/hosts
+      become: true
+      vars:
+        ansible_become_pass: password
+
+    - name: Read pms18_hosts file
+      ansible.builtin.slurp:
+        src: /home/itp22109/pms18/Vagrant/pms18_hosts
+      register: pms18_hosts_content
+
+    - name: Ensure unique entries in /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "{{ item }}"
+      loop: "{{ pms18_hosts_content['content'] | b64decode | string | split('\n') }}"
+      become: true
+      vars:
+        ansible_become_pass: password
+
+    - name: Copy download /.ssh/config file
+
+    - name: Copy Ansible OC file from GIT Repo
+      ansible.builtin.stat:
+        path: /home/itp22109/pms18/oc-srv-01.yaml
+      register: ansible_oc_stat
+
+    - name: Download Ansible OC file if not exists
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/oc-srv-01.yaml
+        dest: "/home/itp22109/pms18/oc-srv-01.yaml"
+        mode: '0755'
+      when: not pms18_hosts_stat.stat.exists
+
+
+  when: user_choice.user_input == "2"
