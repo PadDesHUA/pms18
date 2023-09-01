@@ -358,7 +358,17 @@
       vars:
         ansible_become_pass: password
 
-    - name: Copy download /.ssh/config file
+    - name: Copy download .ssh/config file
+      ansible.builtin.stat:
+        path: /home/itp22109/.ssh/config
+      register: ssh_config_stat
+
+    - name: Download .ssh/config file if not exists
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant_External/config
+        dest: "/home/itp22109/.ssh/config"
+        mode: '0600'
+      when: not ssh_config_stat.stat.exists
 
     - name: Copy Ansible OC file from GIT Repo
       ansible.builtin.stat:
