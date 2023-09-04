@@ -1,5 +1,0 @@
-Device,CPU %,MEM USAGE/LIMIT,MEM %,NET I/O,BLOCK I/O,PIDS
-oc-srv-01,,0.0,957.5/62.4,0.0,109
-tlg-srv-01,,0.0,957.5/169.1,0.0,98
-infdb-srv-01,,0.0,957.5/93.4,0.0,96
-grf-srv-01,,0.0,957.5/118.1,0.0,94
