@@ -10,7 +10,7 @@ Vagrant.configure("2") do |config|
       vb.gui = false
       vb.memory = "1024"
     end
-  
+
     config.vm.define "oc-srv-01", override: true do |node|
       node.vm.box = "ubuntu/jammy64"
       node.vm.hostname = "oc-srv-01"
@@ -18,11 +18,13 @@ Vagrant.configure("2") do |config|
       node.vm.provider :virtualbox do |vb|
         vb.name = "OwnCloud"
         vb.cpus = 1
-      #node.vm.provision :shell, inline: 'cat /vagrant/control_external.pub >> /home/vagrant/.ssh/authorized_keys'
+	vb.customize ["modifyvm", :id, "--natpf1", "owncloud,tcp,,8080,,80"]
       end
 
       node.vm.provision :shell, :inline => <<-SHELL
-      cat /vagrant/pms18_hosts >> /etc/hosts
+      ssh-keygen -t rsa -b 2048 -N "" -f /home/vagrant/.ssh/id_rsa_oc-srv-01
+      cat /vagrant/control_external.pub >> /home/vagrant/.ssh/authorized_keys
+      cat /vagrant/pms18_hosts >> /etc/hosts      
       SHELL
     end
 
@@ -38,8 +40,9 @@ Vagrant.configure("2") do |config|
       end
 
       node.vm.provision :shell, :inline => <<-SHELL
+      ssh-keygen -t rsa -b 2048 -N "" -f /home/vagrant/.ssh/id_rsa_infdb-srv-01
       cat /vagrant/control_external.pub >> /home/vagrant/.ssh/authorized_keys
-      cat /vagrant/pms18_hosts >> /etc/hosts
+      cat /vagrant/pms18_hosts >> /etc/hosts      
       sudo apt update
       SHELL
     end
@@ -51,12 +54,17 @@ Vagrant.configure("2") do |config|
       node.vm.provider :virtualbox do |vb|
         vb.name = "Grafana"
         vb.cpus = 1
+        # Add the port forwarding configuration for port 3000
+        vb.customize ["modifyvm", :id, "--natpf1", "Grafana,tcp,,3000,,3000"]
       end
-      
+
+      node.vm.provision :file, source: "control_external.pub", destination: "/home/vagrant/.ssh/authorized_keys"
+      node.vm.provision :file, source: "pms18_hosts", destination: "/etc/hosts"
       node.vm.provision :shell, :inline => <<-SHELL
-      cat /vagrant/control_external.pub >> /home/vagrant/.ssh/authorized_keys
-      cat /vagrant/pms18_hosts >> /etc/hosts
+      ssh-keygen -t rsa -b 2048 -N "" -f /home/vagrant/.ssh/id_rsa_grf-srv-01      
+      sudo apt update
       SHELL
+
     end
 
     config.vm.define "tlg-srv-01", override: true do |node|
@@ -70,9 +78,10 @@ Vagrant.configure("2") do |config|
       end
       
       node.vm.provision :shell, :inline => <<-SHELL
+      ssh-keygen -t rsa -b 2048 -N "" -f /home/vagrant/.ssh/id_rsa_grf-srv-01
       cat /vagrant/control_external.pub >> /home/vagrant/.ssh/authorized_keys
       cat /vagrant/pms18_hosts >> /etc/hosts
-
+      cp /vagrant/telegraf.conf /etc/telegraf/telegraf.conf
       SHELL
     end
 

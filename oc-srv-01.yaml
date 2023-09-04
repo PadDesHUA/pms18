@@ -161,58 +161,6 @@
     ln -s /etc/apache2/sites-available/owncloud.conf /etc/apache2/sites-enabled/owncloud.conf
   args:
     chdir: "/var/www/"
-  
-  # block:
-
-  #   - name: Download ownCloud
-  #     get_url:
-  #       url: "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2"
-  #       dest: "/tmp/owncloud-complete-latest.tar.bz2"
-
-  #   - name: Download keyfile
-  #     get_url:
-  #       url: "https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2.sha256"
-  #       dest: "/tmp/owncloud-complete-latest.tar.bz2.sha256"
-  #     ignore_errors: yes
-
-  #   - name: Verify key file
-  #     shell: "sha256sum -c owncloud-complete-latest.tar.bz2.sha256 < owncloud-complete-latest.tar.bz2"
-  #     args:
-  #       chdir: "/tmp"
-  #     register: sha_verification
-  #     failed_when: sha_verification.rc != 0
-  #     ignore_errors: yes
-
-  #   - name: Unzip owncloud
-  #     args:
-  #       chdir: "/tmp"
-  #     shell: |
-  #       tar -xjvf owncloud-complete-latest.tar.bz2 
-  #       sudo cp -r owncloud /var/www/
-    
-  #   - name: Set permissions owncloud
-  #     file:
-  #       path: "/var/www/owncloud"
-  #       owner: www-data
-  #       group: www-data
-  #       recurse: yes
-  #     become: yes
-  #     ignore_errors: yes
-
-  #   - name: Set permissions occ symb link
-  #     file:
-  #       path: "/var/www/occ"
-  #       owner: www-data
-  #       group: www-data
-  #       recurse: yes
-  #     become: yes
-  #     ignore_errors: yes
-    
-  #   - name: Create owncloud.conf file
-  #     file:
-  #       path: /etc/apache2/sites-available/owncloud.conf
-  #       state: touch
-  #     become: yes
 
 - name: Update owncloud.conf
   blockinfile:
@@ -230,13 +178,6 @@
       </Directory>
   become: yes
 
-    # - name: Create symlink for owncloud.conf
-    #   file:
-    #     src: /etc/apache2/sites-available/owncloud.conf
-    #     dest: /etc/apache2/sites-enabled/owncloud.conf
-    #     state: link
-    #   become: yes
-
 - name: Restart Apache service
   service:
     name: apache2
@@ -248,38 +189,13 @@
     name: smbclient
     state: present
   become: yes
-    
+
 - name: Enable smbclient PHP extension
   lineinfile:
     dest: "/etc/php/7.4/cli/php.ini"
     regexp: '^;?extension=smbclient\.so$'
     line: 'extension=smbclient.so'
-  # notify:
-  #   - Restart PHP Service
   become: yes
-
-# - name: Restart PHP Service
-#   systemd:
-#     name: php7.4-fpm
-#     state: restarted
-#   become: yes
-#   ignore_errors: yes
-
-    # - name: Ensure occ script path
-    #   shell: |
-    #     cd /var/www/
-    #     ln -s /var/www/owncloud/occ occ
-    #   args:
-    #     executable: /bin/bash
-    #   become: yes
-    #   ignore_errors: yes
-
-    # - name: Restart Apache service
-    #   service:
-    #     name: apache2
-    #     state: restarted
-    #   become: yes
-    #   ignore_errors: yes
 
 - name: Run occ maintenance:install
   args:
@@ -312,9 +228,16 @@
     sed -i '14{s/oc-srv-01/localhost/}' /var/www/owncloud/config/config.php
   become: yes
 
-        
-# handlers:
-#   - name: Restart PHP Service
-#     systemd:
-#       name: php7.4-fpm
-#       state: restarted
+- name: Update trusted domains with 'pms18.ddns.net' in OwnCloud config
+  become: yes
+  lineinfile:
+    path: /var/www/owncloud/config/config.php
+    regexp: "^(\\s*'trusted_domains' =>\\s*\\()"
+    line: "        1 => 'pms18.ddns.net',"
+    insertafter: "0 => 'oc-srv-01',"
+
+- name: Restart Apache service
+  service:
+    name: apache2
+    state: restarted
+  become: yes

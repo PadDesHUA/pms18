@@ -26,6 +26,12 @@
         name: telegraf
         state: present
     
+    - name: Install bc command
+      become: yes
+      apt:
+        name: bc
+        state: present
+    
     - name: Create a copy of telegraf.conf if not exists
       become: yes
       ansible.builtin.stat:
@@ -42,6 +48,17 @@
       become: yes
       shell: |
         cp /vagrant/telegraf.conf /etc/telegraf/telegraf.conf
+        chmod 777 /vagrant/top-infdb-srv-01.sh 
+        chmod 777 /vagrant/top-influxdb.sh
+        chmod 777 /vagrant/top-oc-srv-01.sh 
+        chmod 777 /vagrant/top-owncloud.sh
+        chmod 777 /vagrant/top-tlg-srv-01.sh 
+        chmod 777 /vagrant/top-telegraf.sh
+        chmod 777 /vagrant/top-grf-srv-01.sh 
+        chmod 777 /vagrant/top-grafana.sh
+        chmod 777 /vagrant/dns.sh 
+        chown vagrant:vagrant /temp/metrics.out
+        timedatectl set-timezone Europe/Athens
     
     - name: Make folder and file for outputs.file
       become: yes
@@ -55,73 +72,33 @@
         state: restarted
       become: yes
 
-    # - name: Set the user_vm_choice variable
-    #   set_fact:
-    #     user_vm_choice: infdb-srv-01
+    - name: Add vagrant user to sudoers
+      become: yes
+      lineinfile:
+        path: /etc/sudoers
+        regexp: '^vagrant ALL='
+        line: 'vagrant ALL=NOPASSWD: /usr/sbin/smartctl'
+        validate: 'visudo -cf %s'
 
-    # - name: Test Influxdb database task_results
-    #   become: yes
-    #   # delegate_to: infdb-srv-01
-    #   shell: |
-    #     influx -precision rfc3339 -database telegraf -execute 'SELECT * from cpu' -format 'csv' -pretty
-    #   register: command_output
-    #   changed_when: false   # Prevent Ansible from marking the task as changed
+    - name: Check if vagrant user is defined
+      shell: grep -q 'User=vagrant' /usr/lib/systemd/system/telegraf.service
+      register: grep_result
+      ignore_errors: yes
+
+    - name: Modify telegraf.service if vagrant user is not defined
+      lineinfile:
+        path: /usr/lib/systemd/system/telegraf.service
+        regexp: '^User='
+        line: 'User=vagrant'
+      when: grep_result.rc != 0
     
-    # - name: Display the command output
-    #   debug:
-    #     var: command_output.stdout_lines
-            
+    - name: Display result
+      debug:
+        var: grep_result.rc
+        msg: "vagrant user is{{ ' not' if grep_result.rc != 0 else '' }} defined in telegraf.service"
 
-    # - name: Modify telegraf.conf
-    #   become: yes
-    #   block:
-    #     - name: Uncomment [[ outputs.file ]]
-    #       shell: |
-    #         sed -i '976{s/oc-srv-01/localhost/}' /var/www/owncloud/config/config.php
-    #       become: yes
-    #       lineinfile:
-    #         path: /etc/telegraf/telegraf.conf
-    #         regexp: '^#\s*\[\[ outputs\.file \]\]'
-    #         line: '[[ outputs.file ]]'
-
-    #     - name: Uncomment and configure files in [[ outputs.file ]]
-    #       lineinfile:
-    #         path: /etc/telegraf/telegraf.conf
-    #         regexp: '^#?\s*files = \["stdout", "/temp/metrics\.out"\]'
-    #         line: 'files = ["/temp/metrics.out"]'
-
-    #     - name: Uncomment rotation_interval in [[ outputs.file ]]
-    #       lineinfile:
-    #         path: /etc/telegraf/telegraf.conf
-    #         regexp: '^#?\s*rotation_interval = ".*"'
-    #         line: 'rotation_interval = "1h"'
-
-    #     - name: Uncomment [[ outputs.influxdb ]]
-    #       lineinfile:
-    #         path: /etc/telegraf/telegraf.conf
-    #         regexp: '^#\s*\[\[ outputs\.influxdb \]\]'
-    #         line: '[[ outputs.influxdb ]]'
-
-    #     - name: Uncomment and configure urls in [[ outputs.influxdb ]]
-    #       lineinfile:
-    #         path: /etc/telegraf/telegraf.conf
-    #         regexp: '^#?\s*urls = \["https://127\.0\.0\.1:8086"\]'
-    #         line: 'urls = ["https://infdb-srv-01:8086"]'
-
-    #     - name: Uncomment database in [[ outputs.influxdb ]]
-    #       lineinfile:
-    #         path: /etc/telegraf/telegraf.conf
-    #         regexp: '^#?\s*database = ".*"'
-    #         line: 'database = "telegraf"'
-
-    #     - name: Configure default_tag
-    #       lineinfile:
-    #         path: /etc/telegraf/telegraf.conf
-    #         regexp: '^default_tag ='
-    #         line: 'default_tag = ""'
-
-    #     - name: Configure retention_policy
-    #       lineinfile:
-    #         path: /etc/telegraf/telegraf.conf
-    #         regexp: '^retention_policy ='
-    #         line: 'retention_policy = ""'
+    - name: Restart Telegraf service
+      service:
+        name: telegraf
+        state: restarted
+      become: yes

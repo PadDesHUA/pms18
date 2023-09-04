@@ -5,8 +5,10 @@
 
 #   tasks:
     - name: Download InfluxData archive key
-      command: wget -q https://repos.influxdata.com/influxdata-archive_compat.key
+      shell: |
+       wget -q https://repos.influxdata.com/influxdata-archive_compat.key
       register: key_download_result
+      
 
     - name: Verify key using sha256sum
       shell: echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c influxdata-archive_compat.key' | sha256sum -c
@@ -37,39 +39,27 @@
         name: influxdb
         state: started
 
-    - name: Download InfluxData public key
-      command: curl -s https://repos.influxdata.com/influxdata-archive_compat.key
-      register: key_download_result
-
-    - name: Import InfluxData public key
-      command: echo "{{ key_download_result.stdout }}" | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
-
-    - name: Download InfluxDB release archive
-      command: wget https://dl.influxdata.com/influxdb/releases/influxdb-1.8.10_linux_amd64.tar.gz
-      register: download_result
-
-    - name: Download InfluxDB release archive
-      command: curl -o influxdb-1.8.10_linux_amd64.tar.gz https://dl.influxdata.com/influxdb/releases/influxdb-1.8.10_linux_amd64.tar.gz
-      register: download_result
-      ignore_errors: yes
-
-    - name: Import InfluxData public key for verification
-      become: yes
-      command: gpg --import /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg
+    - name: Download and import InfluxData public key
+      shell: |
+        curl -s https://repos.influxdata.com/influxdata-archive_compat.key | gpg --import
+      register: import_key_result
+      changed_when: import_key_result.stdout.find("not changed") == -1
+    
+    - name: Download signature file
+      shell: |
+        wget https://dl.influxdata.com/influxdb/releases/influxdb-1.8.10_linux_amd64.tar.gz.asc
+      register: download_signature_result
+      changed_when: download_signature_result.stdout.find("not retrieved") == -1
 
     - name: Verify signature
-      command: gpg --verify influxdb-1.8.10_linux_amd64.tar.gz.asc influxdb-1.8.10_linux_amd64.tar.gz
-      register: signature_verification_result
-      failed_when: signature_verification_result.rc != 0
-      changed_when: false
-      ignore_errors: yes
+      shell: |
+        gpg --verify influxdb-1.8.10_linux_amd64.tar.gz.asc influxdb-1.8.10_linux_amd64.tar.gz
+      register: verify_signature_result
+      changed_when: verify_signature_result.stdout.find("Good signature") == -1
 
-    - name: Prompt installation success
+    - name: Display verification output
       debug:
-        msg: "InfluxDB installation, user setup, and verification successful."
-      when: '"gpg: Good signature from \\"InfluxDB Packaging Service <support@influxdb.com>\\" [unknown]" in signature_verification_result.stdout'
-      ignore_errors: yes
-
+        var: verify_signature_result.stdout_lines
 
     - name: Create initial user
       shell: influx -execute "CREATE USER influx_admin WITH PASSWORD 'password' WITH ALL PRIVILEGES"
@@ -87,15 +77,3 @@
         owner: vagrant
         group: vagrant
         mode: "0644"
-
-    - name: Install InfluxDB-client
-      become: yes
-      apt:
-        name: influxdb-client
-        state: present
-
-  # handlers:
-  #   - name: Start InfluxDB service
-  #     systemd:
-  #         name: influxdb
-  #         state: started
