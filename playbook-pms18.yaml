@@ -23,90 +23,94 @@
         ansible_user: itp22109
         ansible_host: control
 
-    - name: Generate SSH Key Pair
-      openssh_keypair:
-        path: /home/itp22109/.ssh/control_key
-        owner: itp22109
-        group: itp22109
-      when: control_host_ip.stdout != "192.168.56.10"
+    - name: Executed when Control station not external
+      block:
+        - name: Generate SSH Key Pair
+          openssh_keypair:
+            path: /home/itp22109/.ssh/control_key
+            owner: itp22109
+            group: itp22109
+          when: control_host_ip.stdout != "192.168.56.10"
 
-    - name: Get Vagrant VMs
-      shell: |
-        cd /home/itp22109/pms18/Vagrant/
-        vagrant status | awk '{print $1}' | awk 'NR>2' | head -n -3
-      register: vagrant_output
+        - name: Get Vagrant VMs
+          shell: |
+            cd /home/itp22109/pms18/Vagrant/
+            vagrant status | awk '{print $1}' | awk 'NR>2' | head -n -3
+          register: vagrant_output
 
-    - name: Extract VM names
-      set_fact:
-        vm_names: "{{ vagrant_output.stdout_lines + ['all'] }}"
+        - name: Extract VM names
+          set_fact:
+            vm_names: "{{ vagrant_output.stdout_lines + ['all'] }}"
 
-    - name: Display VM choices
-      debug:
-        msg: "Select a VM: {{ vm_names }}"
+        - name: Display VM choices
+          debug:
+            msg: "Select a VM: {{ vm_names }}"
 
-    - name: User Input for VM choice
-      pause:
-        prompt: "Choose a VM from the list above"
-      register: user_vm_choice
+        - name: User Input for VM choice
+          pause:
+            prompt: "Choose a VM from the list above"
+          register: user_vm_choice
 
-    - name: Execute vagrant up for selected VM
-      shell: |
-       cd /home/itp22109/pms18/Vagrant/
-       vagrant up {{ user_vm_choice.user_input }}
-      when: user_vm_choice.user_input != 'all'
-    
-    - name: Execute vagrant up for selected VM
-      shell: |
-       cd /home/itp22109/pms18/Vagrant/
-       vagrant up
-      when: user_vm_choice.user_input == 'all'
+        - name: Execute vagrant up for selected VM
+          shell: |
+            cd /home/itp22109/pms18/Vagrant/
+            vagrant up {{ user_vm_choice.user_input }}
+          when: user_vm_choice.user_input != 'all'
+        
+        - name: Execute vagrant up for selected VM
+          shell: |
+            cd /home/itp22109/pms18/Vagrant/
+            vagrant up
+          when: user_vm_choice.user_input == 'all'
 
-#below lines are used when I use my laptop as control
-    - name: Delete previous key if exists
-      become: yes
-      shell: |
-        ssh-keygen -f "/home/itp22109/.ssh/known_hosts" -R "{{ user_vm_choice.user_input }}"    
-        chown itp22109:itp22109 ~/.ssh/known_hosts
-      vars:
-        ansible_become_pass: password
+        #below lines are used when I use my laptop as control
+        - name: Delete previous key if exists
+          become: yes
+          become_user: itp22109
+          shell: |
+            ssh-keygen -f "/home/itp22109/.ssh/known_hosts" -R "{{ user_vm_choice.user_input }}"    
+            chown itp22109:itp22109 ~/.ssh/known_hosts
+          vars:
+            ansible_become_pass: password
 
-    - name: Pass SSH Key of my laptop with vagrant
-      shell: |
-        cd /home/itp22109/pms18/Vagrant/
-        vagrant ssh-config --host {{ user_vm_choice.user_input }} >> ~/.ssh/config
-      register: sshkey_result
+        - name: Pass SSH Key of my laptop with vagrant
+          shell: |
+            cd /home/itp22109/pms18/Vagrant/
+            vagrant ssh-config --host {{ user_vm_choice.user_input }} >> ~/.ssh/config
+          register: sshkey_result
 
-    - name: Tet SSH connection from my laptop and accept key
-      command: ssh -o StrictHostKeyChecking=no vagrant@{{ user_vm_choice.user_input }}
-      register: ssh_result
-      ignore_errors: yes
+        - name: Tet SSH connection from my laptop and accept key
+          command: ssh -o StrictHostKeyChecking=no vagrant@{{ user_vm_choice.user_input }}
+          register: ssh_result
+          ignore_errors: yes
 
-    - name: Display SSH test result
-      debug:
-       var: ssh_result.stdout_lines
+        - name: Display SSH test result
+          debug:
+            var: ssh_result.stdout_lines
+      
+        - name: User Input for Playbook choice
+          pause:
+            prompt: "Do you want to run the Ansible playbook on the selected VM? (yes/no)"
+          register: user_playbook_choice
 
-    - name: User Input for Playbook choice
-      pause:
-        prompt: "Do you want to run the Ansible playbook on the selected VM? (yes/no)"
-      register: user_playbook_choice
+        - name: Copy Public Key to VMs
+          become: yes
+          shell: |
+            ssh-copy-id -i /home/itp22109/.ssh/control_key.pub vagrant@{{ item }}
+            chown vagrant:vagrant /home/vagrant/.ssh/control_key.pub
+          loop: "{{ vagrant_output.stdout_lines }}"
+          ignore_errors: yes
 
-    - name: Copy Public Key to VMs
-      become: yes
-      shell: |
-        ssh-copy-id -i /home/itp22109/.ssh/control_key.pub vagrant@{{ item }}
-        chown vagrant:vagrant /home/vagrant/.ssh/control_key.pub
-      loop: "{{ vagrant_output.stdout_lines }}"
-      ignore_errors: yes
-
-    - name: Execute Ansible playbook based on user choice
-      include_tasks: "{{ user_vm_choice.user_input }}.yaml"
-      when: user_vm_choice.user_input != 'all' and user_playbook_choice.user_input == 'yes'
-      # delegate_to: oc-srv-01
-      vars: 
-        ansible_connection: ssh
-        ansible_user: vagrant
-        ansible_host: "{{ user_vm_choice.user_input }}"
-
+        - name: Execute Ansible playbook based on user choice
+          include_tasks: "{{ user_vm_choice.user_input }}.yaml"
+          when: user_vm_choice.user_input != 'all' and user_playbook_choice.user_input == 'yes'
+          # delegate_to: oc-srv-01
+          vars: 
+            ansible_connection: ssh
+            ansible_user: vagrant
+            ansible_host: "{{ user_vm_choice.user_input }}"
+      
+      when: control_host_ip.stdout = "192.168.56.10"
 
 - name: Read local /etc/hosts file
   hosts: localhost
@@ -114,7 +118,7 @@
   tasks:
     - name: Read /etc/hosts file
       shell: cat /etc/hosts | grep 192.168.56. > ~/pms18/Vagrant/pms18_hosts
-
+      when: control_host_ip.stdout = "192.168.56.10"
 
 - name: Append local /etc/hosts entries to remote hosts
   hosts: all
@@ -122,6 +126,6 @@
   tasks:
     - name: Append /etc/hosts entries
       shell: cat /vagrant/pms18_hosts >> /etc/hosts
-
+      when: control_host_ip.stdout = "192.168.56.10"
 
 

@@ -1,0 +1,104 @@
+---
+- name: Install Telegraf
+  hosts: tlg-srv-01
+  become: yes
+  tasks:
+    - name: Download the InfluxData GPG key
+      command: wget -q https://repos.influxdata.com/influxdata-archive_compat.key
+
+    - name: Verify the GPG key using sha256sum
+      command: echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c influxdata-archive_compat.key' | sha256sum -c
+
+    - name: Add the GPG key to trusted keys
+      shell: cat influxdata-archive_compat.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
+
+    - name: Add the InfluxData repository to sources.list.d
+      shell: echo 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main' | sudo tee /etc/apt/sources.list.d/influxdata.list
+
+    - name: Update apt cache
+      become: yes
+      apt:
+        update_cache: yes
+
+    - name: Install Telegraf
+      become: yes
+      apt:
+        name: telegraf
+        state: present
+    
+    - name: Install bc command
+      become: yes
+      apt:
+        name: bc
+        state: present
+    
+    - name: Create a copy of telegraf.conf if not exists
+      become: yes
+      ansible.builtin.stat:
+        path: /etc/telegraf/telegraf.conf.orig
+      register: telegraf_conf_orig
+
+    - name: Create a copy of telegraf.conf
+      become: yes
+      shell: |
+        cp /etc/telegraf/telegraf.conf /etc/telegraf/telegraf.conf.orig
+      when: not telegraf_conf_orig.stat.exists
+
+    - name: Copy telegraf.conf from Control Station
+      become: yes
+      shell: |
+        cp /vagrant/telegraf.conf /etc/telegraf/telegraf.conf
+        chmod 777 /vagrant/top-infdb-srv-01.sh 
+        chmod 777 /vagrant/top-influxdb.sh
+        chmod 777 /vagrant/top-oc-srv-01.sh 
+        chmod 777 /vagrant/top-owncloud.sh
+        chmod 777 /vagrant/top-tlg-srv-01.sh 
+        chmod 777 /vagrant/top-telegraf.sh
+        chmod 777 /vagrant/top-grf-srv-01.sh 
+        chmod 777 /vagrant/top-grafana.sh
+        chmod 777 /vagrant/dns.sh 
+        chown vagrant:vagrant /temp/metrics.out
+        timedatectl set-timezone Europe/Athens
+    
+    - name: Make folder and file for outputs.file
+      become: yes
+      shell: |
+        mkdir /temp
+        touch /temp/metrics.out
+    
+    - name: Restart Telegraf service
+      service:
+        name: telegraf
+        state: restarted
+      become: yes
+
+    - name: Add vagrant user to sudoers
+      become: yes
+      lineinfile:
+        path: /etc/sudoers
+        regexp: '^vagrant ALL='
+        line: 'vagrant ALL=NOPASSWD: /usr/sbin/smartctl'
+        validate: 'visudo -cf %s'
+
+    - name: Check if vagrant user is defined
+      shell: grep -q 'User=vagrant' /usr/lib/systemd/system/telegraf.service
+      register: grep_result
+      ignore_errors: yes
+
+    - name: Modify telegraf.service if vagrant user is not defined
+      lineinfile:
+        path: /usr/lib/systemd/system/telegraf.service
+        regexp: '^User='
+        line: 'User=vagrant'
+      when: grep_result.rc != 0
+    
+    - name: Display result
+      debug:
+        var: grep_result.rc
+        msg: "vagrant user is{{ ' not' if grep_result.rc != 0 else '' }} defined in telegraf.service"
+
+    - name: Restart Telegraf service
+      service:
+        name: telegraf
+        state: restarted
+      become: yes

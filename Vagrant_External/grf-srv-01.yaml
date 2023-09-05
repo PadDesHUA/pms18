@@ -1,0 +1,61 @@
+---      
+- name: Install and configure Grafana
+  hosts: grf-srv-01
+  become: true
+  tasks:
+    - name: Install prerequisites
+      become: yes
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - apt-transport-https
+        - software-properties-common
+        - wget
+    
+    - name: Add Grafana GPG key
+      become: yes
+      shell: |
+        wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key --no-check-certificate
+      changed_when: false  # Assuming the key doesn't change frequently
+
+    - name: Add Grafana repository
+      become: yes
+      shell: |
+        echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
+
+      # blockinfile:
+      #   path: /etc/apt/sources.list.d/grafana.list
+      #   block: |
+      #     deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main
+      #     deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com beta main
+
+    - name: Update package cache
+      become: yes
+      apt:
+        update_cache: yes
+
+    - name: Install Grafana
+      become: yes
+      apt:
+        name: grafana
+        state: present
+        allow_unauthenticated: yes  # Allow installation of unauthenticated packages
+
+    - name: Reload systemd
+      become: yes
+      systemd:
+        daemon_reload: yes
+
+    - name: Start Grafana service
+      become: yes
+      systemd:
+        name: grafana-server
+        state: started
+        enabled: yes
+
+    - name: Check Grafana service status
+      become: yes
+      shell: | 
+        sudo systemctl status grafana-server
+

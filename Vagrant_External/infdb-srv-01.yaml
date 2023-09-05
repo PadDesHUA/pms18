@@ -1,0 +1,79 @@
+---
+- name: Install InfluxDB
+  hosts: infdb-srv-01
+  become: yes
+
+  tasks:
+    - name: Download InfluxData archive key
+      shell: |
+       wget -q https://repos.influxdata.com/influxdata-archive_compat.key
+      register: key_download_result
+      
+
+    - name: Verify key using sha256sum
+      shell: echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c influxdata-archive_compat.key' | sha256sum -c
+      register: key_verification_result
+      failed_when: key_verification_result.rc != 0
+
+    - name: Import key and trust GPG key
+      shell: cat influxdata-archive_compat.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
+      when: key_verification_result.rc == 0
+
+    - name: Add InfluxData repository
+      shell: echo 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main' | sudo tee /etc/apt/sources.list.d/influxdata.list
+
+    - name: Update apt cache
+      become: yes
+      apt:
+        update_cache: yes
+
+    - name: Install InfluxDB
+      become: yes
+      apt:
+        name: influxdb
+        state: present
+
+    - name: Start InfluxDB service
+      become: yes
+      service:
+        name: influxdb
+        state: started
+
+    - name: Download and import InfluxData public key
+      shell: |
+        curl -s https://repos.influxdata.com/influxdata-archive_compat.key | gpg --import
+      register: import_key_result
+      changed_when: import_key_result.stdout.find("not changed") == -1
+    
+    - name: Download signature file
+      shell: |
+        wget https://dl.influxdata.com/influxdb/releases/influxdb-1.8.10_linux_amd64.tar.gz.asc
+      register: download_signature_result
+      changed_when: download_signature_result.stdout.find("not retrieved") == -1
+
+    - name: Verify signature
+      shell: |
+        gpg --verify influxdb-1.8.10_linux_amd64.tar.gz.asc influxdb-1.8.10_linux_amd64.tar.gz
+      register: verify_signature_result
+      changed_when: verify_signature_result.stdout.find("Good signature") == -1
+
+    - name: Display verification output
+      debug:
+        var: verify_signature_result.stdout_lines
+
+    - name: Create initial user
+      shell: influx -execute "CREATE USER influx_admin WITH PASSWORD 'password' WITH ALL PRIVILEGES"
+      changed_when: false
+
+    - name: Get authentication token
+      shell: influx auth create -n influx_admin -p 'password' --org pms18@HUA --hide-headers | awk '{print $3}'
+      register: auth_token
+
+    - name: Store authentication token to file
+      become: yes
+      copy:
+        content: "{{ auth_token.stdout }}"
+        dest: /home/vagrant/.ssh/infdb-token
+        owner: vagrant
+        group: vagrant
+        mode: "0644"

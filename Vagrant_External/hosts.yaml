@@ -1,0 +1,26 @@
+---
+#This is the inventory file with the groups of servers, which are the target machines I want to manage
+control:
+  hosts:
+    control:
+      ansible_host: control
+
+grafana-server:
+  hosts:
+    grf-srv-01:
+       ansible_host: grf-srv-01 #we can insert either ip or name and read it from ~/home/itp22109/ssh_config
+
+influxdb-server:
+  hosts:
+    infdb-srv-01:
+       ansible_host: infdb-srv-01 
+
+owncloud-server:
+  hosts:
+    oc-srv-01:
+       ansible_host: oc-srv-01
+
+telegraf-server:
+  hosts:
+    tlg-srv-01:
+       ansible_host: tlg-srv-01
