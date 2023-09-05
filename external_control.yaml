@@ -476,6 +476,6 @@
         url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant_External/hosts.yaml
         dest: /home/itp22109/pms18/hosts.yaml
         mode: '0755'
-      when: not ansible_hostsstat.stat.exists
+      when: not ansible_hosts_stat.stat.exists
 
 #  when: user_choice.user_input == "2"
