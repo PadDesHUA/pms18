@@ -1,0 +1,18 @@
+Host grf-srv-01
+	HostName 192.168.56.40
+
+Host infdb-srv-01
+	HostName 192.168.56.30
+
+Host oc-srv-01
+	HostName 192.168.56.20
+
+Host tlg-srv-01
+	HostName 192.168.56.50
+
+Host control
+	Hostname 192.168.56.10
+	
+
+Host *
+	User vagrant

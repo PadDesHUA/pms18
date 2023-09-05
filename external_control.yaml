@@ -50,21 +50,18 @@
       debug:
         var: vagrant_install_latest.stdout_lines
 
-
-    - name: Prequisites for Installation of VirtualBox-7
+    - name: Import VirtualBox gpg key and add Repo
       become: yes
       shell: |
-        curl https://www.virtualbox.org/download/oracle_vbox_2016.asc | gpg --dearmor > oracle_vbox_2016.gpg
-        curl https://www.virtualbox.org/download/oracle_vbox.asc | gpg --dearmor > oracle_vbox.gpg
-        install -o root -g root -m 644 oracle_vbox_2016.gpg /etc/apt/trusted.gpg.d/
-        install -o root -g root -m 644 oracle_vbox.gpg /etc/apt/trusted.gpg.d/ 
-        echo "deb [arch=amd64] http://download.virtualbox.org/virtualbox/debian $(lsb_release -sc) contrib" | sudo tee /etc/apt/sources.list.d/virtualbox.list
+        wget -O- https://www.virtualbox.org/download/oracle_vbox_2016.asc | sudo gpg --dearmor --yes --output /usr/share/keyrings/oracle-virtualbox-2016.gpg
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/oracle-virtualbox-2016.gpg] http://download.virtualbox.org/virtualbox/debian $(lsb_release -cs) contrib" | sudo tee /etc/apt/sources.list.d/virtualbox.list
       vars:
         ansible_become_pass: password
 
-    - name: Update apt update_cache
+    - name: Update apt update_cache 
       apt:
         update_cache: yes
+    
 
     - name: Install VirtualBox-7 and add user to Group
       shell: |
@@ -288,15 +285,47 @@
         mode: '0755'
       when: not influxdb_script_stat.stat.exists
 
-    - name: Check if symbolic link exists
+    - name: Check if symbolic link exists for public key
+      become: yes
       ansible.builtin.stat:
         path: control_external.pub
       register: symlink_stat
+      vars: 
+        ansible_become_pass: password 
 
     - name: Create symbolic link and copy pub key from Control External
       ansible.builtin.shell: >
         ln -n ~/.ssh/control_external.pub control_external.pub
       when: not symlink_stat.stat.exists
+
+    - name: Check if Vagrant folder
+      ansible.builtin.stat:
+        path: /home/itp22109/pms18/Vagrant/
+      register: vagrantfolder_stat
+
+
+    - name: Create and copy Vagrant folder and files
+      become: yes
+      shell: |
+        mkdir /home/itp22109/pms18/
+        mkdir /home/itp22109/pms18/Vagrant/
+        chmod 0755 -R /home/itp22109/pms18/
+        chown itp22109:itp22109 -R /home/itp22109/pms18/
+      when: not vagrantfolder_stat.stat.exists
+      vars:
+        ansible_become_pass: password
+
+    - name: Check if Vagrantfile file exists
+      ansible.builtin.stat:
+        path: /home/itp22109/pms18/Vagrant/Vagrantfile
+      register: Vagrantfile_script_stat
+
+    - name: Download Vagrantfile if not exists
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/PadDesHUA/pms18/main/Vagrant_External/Vagrantfile
+        dest: /home/itp22109/pms18/Vagrant/Vagrantfile
+        mode: '0755'
+      when: not Vagrantfile_script_stat.stat.exists
 
     - name: Execute vagrant up for PMS VMs
       ansible.builtin.shell: vagrant up
